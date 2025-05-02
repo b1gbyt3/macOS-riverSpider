@@ -653,7 +653,6 @@ EOF
 
 # This part of the setup cannot be automated by the script.
 display_riverspider_setup_instructions() {
-  log_info "Setup complete!"
   echo ""
   log_warning "Manual setup of River Spider required:"
 
@@ -691,6 +690,19 @@ display_riverspider_setup_instructions() {
   echo ""
 }
 
+display_completion_message() {
+  echo ""
+  log_info "Setup complete!"
+  log_info "───────────────────────────────────────────────"
+  log_info "Please restart your terminal"
+  log_info "or run: source ${SHELL_PROFILE_FILE}"
+  log_info "to apply all changes."
+  log_info "───────────────────────────────────────────────"
+  log_info "Log file: ${LOG_FILE}"
+  echo ""
+  
+  log_debug "Script completed successfully at $(date)"
+}
 
 main() {
   setup_terminal_colors
@@ -728,7 +740,7 @@ main() {
   
   display_riverspider_setup_instructions       # Show Google Sheets steps.
   
-  source "${SHELL_PROFILE_FILE}"
+  display_completion_message
   
   return 0
 }
