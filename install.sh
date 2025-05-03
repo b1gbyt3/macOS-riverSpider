@@ -1,509 +1,698 @@
 #!/bin/bash
-# Tells the computer: "Use 'bash' to run the commands below."
+# ======================================================================================================================================
+# riverSpider macOS Setup Script
+#
+# Author: Ilya Babenko
+# Last updated: 2025-05-02
+# Version: 2.0.1
+#
+# What this script does:
+# This script helps set up the riverSpider on your Mac automatically.
+#   1. Checks System: Confirms macOS, detects chip type (Intel/Apple Silicon),
+#      checks internet, and identifies your shell (Bash/Zsh).
+#   2. Installs Tools: Uses Homebrew (a package manager) to install itself,
+#      and required tools like mise, fd, wget, and coreutils.
+#   3. Installs Java: Uses mise to install the correct Java version for Logisim.
+#   4. Locates or downloads 'riverSpider'.
+#   5. Updates paths inside the 'submit.sh' script so it works correctly
+#      from anywhere.
+#   6. Creates RIVER_SPIDER_DIR variable so your
+#      terminal knows where the 'riverSpider' folder is.
+#   7. Creates an easy command 'riverspider' you can type
+#      in the terminal to run the submit script from anywhere.
+#   8. Creates easy commands: 'logisim','logproc','logalu', and 'logreg' you can type
+#      in the terminal to open Logisim from anywhere.
+#   8. Shows instructions for the manual Google App Script setup.
+#
+# How to use it:
+#   Open your Terminal app and run:
+#   /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/b1gbyt3/macOS-riverSpider/HEAD/install.sh)"
+# ======================================================================================================================================
 
-# --- Safety Rules ---
 # -e: Stop right away if any command fails (has an error).
 # -u: Stop if the script tries to use a name (variable) that hasn't been given a value.
 # -o pipefail: If commands are chained with '|' (like command A | command B),
 #              stop if any command in the chain fails.
 set -euo pipefail
 
-# --- Set Window Title ---
-# Changes the title shown at the top of the terminal window.
-echo -ne "\033]0;riverSpider macOS Setup Script\007"
+# =========================== Global Variables ===========================
 
-# ===================================================================
-# --- Shell Settings Files ---
-# These are names for files that store settings for the shell.
+# ===========================   OK TO CHANGE   ===========================
+
+#  show/hide detailed progress
+readonly VERBOSE="false"
+
+# --- Shell Settings Filenames ---
+# Default names for the shell configuration files.
 # You might need to change these if you use different filenames like '.zshrc' or '.bashrc'.
+readonly ZSH_PROFILE_BASENAME=".zprofile"      # For Zsh shell
+readonly BASH_PROFILE_BASENAME=".bash_profile" # For Bash shell
 
-# ZSH_CONF_FILE: Name of the settings file for the Zsh shell.
-ZSH_CONF_FILE=".zprofile"
-# BASH_CONF_FILE: Name of the settings file for Bash shell.
-BASH_CONF_FILE=".bash_profile"
-# ===================================================================
+# --- Google Drive Info  ---
+# Link and name used in the manual setup instructions for Google Sheets.
+readonly GOOGLE_DRIVE_FOLDER_URL="https://drive.google.com/drive/folders/0BxsMACqxAFNwR1pCb2pPeE5Wb1E?resourcekey=0-fb_u058vHLwLSyiSaBKPoQ"
+readonly GOOGLE_SHEETS_DOC_NAME="'Copy of assemblerStudent'" # The name of the sheet template
+readonly TTPASM_APP_SCRIPT_DEFAULT_PASSWD="1234!@#\$qwerQWER"
+# --- Download riverSpider from Google Drive ---
+readonly RIVER_SPIDER_GOOGLE_DRIVE_FILE_ID="1g63nlTRa-Ibgj0ZUf3HX1fbdSrW90JBs"
+readonly RIVER_SPIDER_ZIP_NAME="riverSpiderForMac.zip"
+readonly RIVER_SPIDER_OUTPUT_FILE="${HOME}/${RIVER_SPIDER_ZIP_NAME}"
+readonly RIVER_SPIDER_EXTRACT_DIRECTORY="${HOME}/temp_riverSpider_extraction"
+readonly RIVER_SPIDER_TARGET_DIRECTORY="${HOME}/riverSpider"
 
-# =========================== GENERAL CONFIG =========================
+# --- Relative Paths in submit.sh ---
+# These are the exact lines the script looks for in 'submit.sh'
+# to replace them with the absolute paths.
+# IF YOU MAKE ANY CHANGES HERE, MAKE SURE TO UPDATE "new_" in update_paths_in_riverspider_submit_script()
+readonly OLD_SECRETS_PATH_LINE='secretPath=secretString.txt'
+readonly OLD_WEBAPP_URL_PATH_LINE='webappUrlPath=webapp.url'
+readonly OLD_LOGISIM_JAR_PATH_LINE='logisimPath=logisim310.jar'
+readonly OLD_PROCESSOR_CIRC_PATH_LINE='processorCircPath=processor0004.circ'
+readonly OLD_URLENCODE_SED_PATH_LINE='urlencodeSedPath=urlencode.sed'
+
+# --- riverSpider Filenames ---
+# Names of files inside the 'riverSpider' folder.
+readonly SUBMIT_SCRIPT_NAME="submit.sh"
+readonly SECRET_FILE_NAME="secretString.txt"
+readonly WEBAPP_URL_FILE_NAME="webapp.url"
+readonly LOGISIM_JAR_FILE_NAME="logisim310.jar"
+readonly PROCESSOR_CIRC_FILE_NAME="processor0004.circ"
+readonly URLENCODE_SED_FILE_NAME="urlencode.sed"
+readonly TEST_FILE_NAME="test.ttpasm"
+
+# =======================  END OK TO CHANGE  ========================
+
+# ========================== DO NOT CHANGE ==========================
 
 # --- Log File ---
-LOG_FILE="/tmp/riverspider_setup_$(date +%Y%m%d_%H%M%S).log"
+# Creates a new log file with the date and time in its name each time the script runs.
+readonly LOG_FILE="/tmp/riverspider_setup_$(date +%Y%m%d_%H%M%S).log"
 
-# --- Homebrew Locations ---
-ARM_BREW_PATH="/opt/homebrew/bin/brew"
-INTEL_BREW_PATH="/usr/local/bin/brew"
+# --- Homebrew Install Url ---
+readonly HOMEBREW_INSTALL_URL="https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh"
 
-# --- Software Names ---
-JDK="java@openjdk" 
-REQUIRED_COMMANDS=("curl" "git" "sed" "tr" "find")
-PACKAGES_TO_INSTALL=("coreutils" "wget" "mise" "fd")
-TOOLS_TO_VERIFY=("timeout" "wget" "mise" "fd")
+# --- Homebrew Binary Location ---
+readonly ARM_HOMEBREW_PATH="/opt/homebrew/bin/brew" # Usual place on Apple Silicon Macs
+readonly INTEL_HOMEBREW_PATH="/usr/local/bin/brew"  # Usual place on Intel Macs
 
-# --- Google Drive Info ---
-GOOGLE_DRIVE_URL="https://drive.google.com/drive/folders/0BxsMACqxAFNwR1pCb2pPeE5Wb1E?resourcekey=0-fb_u058vHLwLSyiSaBKPoQ"
-GOOGLE_SHEETS_NAME="'Copy of assemblerStudent'"
+# --- Needed Commands & Tools ---
+# Basic commands the script expects to find on the Mac.
+readonly REQUIRED_SYSTEM_COMMANDS=("mkdir" "mktemp" "rm" "dirname" "basename" "realpath" "touch" "cat" "echo" "printf" "head" "ping" "curl" "unzip" "git" "uname" "sw_vers" "grep" "sed" "tr" "sleep")
+# Java that WORKS with logisim
+readonly JDK_MISE_NAME="java@openjdk"
+readonly HOMEBREW_PACKAGES_TO_INSTALL=("coreutils" "wget" "mise" "fd")
+# Ensure tools are working after installation.
+readonly INSTALLED_TOOLS_TO_VERIFY=("timeout" "wget" "mise" "fd")
 
-# =========================== SUBMIT.SH PATHS =========================
-# submit.sh by default uses a relative path; we will change it to an absolute path.
-# IF YOU MAKE ANY CHANGES HERE, MAKE SURE TO UPDATE "NEW_" in update_riverspider_paths()
+# --- Internet Test Domains ---
+readonly CHECK_DOMAINS=("www.google.com" "www.apple.com" "github.com")
 
-OLD_SECRETS_LINE='secretPath=secretString.txt'
-OLD_WEBAPP_LINE='webappUrlPath=webapp.url'
-OLD_LOGISIM_LINE='logisimPath=logisim310.jar'
-OLD_PROC_LINE='processorCircPath=processor0004.circ'
-OLD_URLENCODE_LINE='urlencodeSedPath=urlencode.sed'
+# ========================= END DO NOT CHANGE =======================
 
 # ===================================================================
-# Makes text in the terminal colorful and bold.
+# These get their actual values while the script runs.
+# Declaring them here makes it clear what information the script keeps track of.
+
+declare CURRENT_SHELL=""          # Which shell is being used ("zsh" or "bash").
+declare SHELL_PROFILE_FILE=""     # Full path to the shell's settings file (like ~/.zprofile).
+declare HOMEBREW_PATH=""          # Where the Homebrew 'brew' command is located.
+declare PROCESSOR_ARCHITECTURE="" # The computer's chip type ("arm64" or "x86_64").
+declare CHIP_TYPE=""              # A friendly name for the chip ("Apple Silicon" or "Intel Processor").
+declare MISE_SHELL_TYPE=""        # The shell name 'mise' needs ("zsh" or "bash").
+declare RIVER_SPIDER_DIR=""       # Full path to where the 'riverSpider' folder was found.
+# ===================================================================
+
+# =========================== HELPER UTILITIES ===========================
+
+command_exists() {
+  command -v "$1" >/dev/null 2>&1
+}
+
+ensure_file_writable() {
+  local file_path="$1"
+  local file_description="${2:-"File"}"
+  if [[ -z "$file_path" ]]; then
+    echo "[ERROR] File path argument is missing." >>"$LOG_FILE"
+    echo "[ERROR] File path argument is missing." >&2
+    exit 1
+  fi
+  if [[ ! -e "$file_path" ]]; then
+    local parent_dir
+    parent_dir=$(dirname "$file_path")
+    if [[ ! -d "$parent_dir" ]]; then
+      echo "[ERROR] Parent directory does not exist: $parent_dir" >>"$LOG_FILE"
+      echo "[ERROR] Parent directory does not exist: $parent_dir" >&2
+      exit 1
+    fi
+    if [[ ! -w "$parent_dir" ]]; then
+      echo "[ERROR] Parent directory is not writable: $parent_dir" >>"$LOG_FILE"
+      echo "[ERROR] Parent directory is not writable: $parent_dir" >&2
+      exit 1
+    fi
+    if ! touch "$file_path"; then
+      echo "[ERROR] Failed to create $file_description: $file_path." >>"$LOG_FILE"
+      echo "[ERROR] Failed to create $file_description: $file_path." >&2
+      exit 1
+    fi
+  elif [[ ! -f "$file_path" ]]; then
+    echo "[ERROR] Path exists but is not a regular file: $file_path" >>"$LOG_FILE"
+    echo "[ERROR] Path exists but is not a regular file: $file_path" >&2
+    exit 1
+  fi
+  if [[ ! -w "$file_path" ]]; then
+    if ! chmod u+w "$file_path"; then
+      echo "[ERROR] Failed to modify permissions for $file_description: $file_path. Check ownership and permissions." >>"$LOG_FILE"
+      echo "[ERROR] Failed to modify permissions for $file_description: $file_path. Check ownership and permissions." >&2
+      exit 1
+    fi
+    if [[ ! -w "$file_path" ]]; then
+      echo "[ERROR] Still not writable after chmod (unexpected): $file_path." >>"$LOG_FILE"
+      echo "[ERROR] Still not writable after chmod (unexpected): $file_path." >&2
+      exit 1
+    fi
+  fi
+}
+
+ensure_shell_profile_exists_and_writable() {
+  local msg="${1:-"shell profile file"}"
+  if [[ -z "$SHELL_PROFILE_FILE" ]]; then
+    log_error "Shell profile file path (SHELL_PROFILE_FILE) was not set. Cannot proceed."
+  fi
+  ensure_file_writable "$SHELL_PROFILE_FILE" "$msg"
+}
+
+add_line_if_missing() {
+  local line="$1" # The text line to add.
+  local file="$2" # The file to add the line to.
+
+  if [[ -z "$line" || -z "$file" ]]; then
+    echo "[ERROR] Cannot add line to file: one of the arguments is missing." >>"$LOG_FILE"
+    echo "[ERROR] Cannot add line to file: one of the arguments is missing." >&2
+    exit 1
+  fi
+
+  ensure_file_writable "$file"
+  # Add the line if it's not already in the file.
+  if ! grep -Fxq -- "$line" "$file"; then
+    echo "[DEBUG] Adding line to $file: $line" >>"$LOG_FILE"
+    echo "" >>"$file"
+    echo "$line" >>"$file"
+    echo "" >>"$file"
+    return 0
+  fi
+  echo "[DEBUG] $line - already exists in $file" >>"$LOG_FILE"
+}
+
+# ========================================================================
+
+# ==========================  MESSAGE HELPERS  ===========================
+
 setup_terminal_colors() {
-  # Check if the script is running in a terminal that shows colors.
   if [[ -t 1 ]]; then
-    # Function to create color codes.
     tty_escape() { printf "\033[%sm" "$1"; }
   else
-    # If not a color terminal, this function does nothing.
     tty_escape() { :; }
   fi
 
-  # Function to make text bold and colored.
   tty_mkbold() { tty_escape "1;$1"; }
 
-  tty_blue=$(tty_mkbold 34)    # Blue color
-  tty_red=$(tty_mkbold 31)     # Red color
-  tty_yellow=$(tty_mkbold 33)  # Yellow color
-  tty_green=$(tty_mkbold 32)   # Green color
-  tty_bold=$(tty_mkbold 39)    # Bold text
-  tty_reset=$(tty_escape 0)    # Reset text to normal
+  tty_blue=$(tty_mkbold 34)   # Blue color
+  tty_red=$(tty_mkbold 31)    # Red color
+  tty_yellow=$(tty_mkbold 33) # Yellow color
+  tty_green=$(tty_mkbold 32)  # Green color
+  tty_bold=$(tty_mkbold 39)   # Bold text
+  tty_reset=$(tty_escape 0)   # Reset text to normal
 }
 
 log_info() {
   local msg="$*"
+  ensure_file_writable "$LOG_FILE" "LOG file"
   printf "${tty_blue}==>${tty_bold} %s${tty_reset}\n" "$msg"
-  echo "[INFO] $msg" >> "$LOG_FILE"
+  echo "[INFO] $msg" >>"$LOG_FILE"
 }
 
 log_success() {
   local msg="$*"
+  ensure_file_writable "$LOG_FILE" "LOG file"
   printf "${tty_green}✓${tty_reset} %s\n" "$msg"
-  echo "[SUCCESS] $msg" >> "$LOG_FILE"
+  echo "[SUCCESS] $msg" >>"$LOG_FILE"
 }
 
 log_warning() {
   local msg="$*"
+  ensure_file_writable "$LOG_FILE" "LOG file"
   printf "${tty_yellow}Warning${tty_reset}: %s\n" "$msg" >&2
-  echo "[WARNING] $msg" >> "$LOG_FILE"
+  echo "[WARNING] $msg" >>"$LOG_FILE"
 }
 
 # Shows error messages and stops the script.
 log_error() {
   local msg="$*"
+  ensure_file_writable "$LOG_FILE" "LOG file"
   printf "${tty_red}Error${tty_reset}: %s\n" "$msg" >&2
-  echo "[ERROR] $msg" >> "$LOG_FILE"
-  echo "[ERROR] Script aborted at $(date)" >> "$LOG_FILE"
+  echo "[ERROR] $msg" >>"$LOG_FILE"
+  echo "[ERROR] Script aborted at $(date)" >>"$LOG_FILE"
   echo "[ERROR] Script aborted at $(date) check logfile $LOG_FILE"
   exit 1
 }
 
 # Writes extra details (debug info) only to the log file.
 log_debug() {
-  echo "[DEBUG] $*" >> "$LOG_FILE"
-}
-
-command_exists() {
-  # Check if the command exists.
-  command -v "$1" >/dev/null 2>&1
-}
-
-add_line_if_missing() {
-  local line="$1"   # The text line to add.
-  local file="$2"   # The file to add the line to.
-
-  # Check if the file exists; create it if it doesn't.
-  [[ -f "$file" ]] || touch "$file" || log_error "Cannot create $file"
-
-  # Add the line if it's not already in the file.
-  if ! grep -qF -- "$line" "$file"; then
-    log_debug "Adding line to $file: $line"
-    echo "" >> "$file"
-    echo "$line" >> "$file"
-    echo "" >> "$file"
-    return 0
+  if [[ "$VERBOSE" == "true" ]]; then
+    echo "[DEBUG] $*"
   fi
+  ensure_file_writable "$LOG_FILE" "LOG file"
+  echo "[DEBUG] $*" >>"$LOG_FILE"
+}
+# ========================================================================
 
-  log_debug "$line - already exists in $file"
-  return 0
+# =========================== PRE FLIGHT CHECKS ==========================
+
+check_required_system_commands() {
+  log_info "Checking for essential commands..."
+  local missing_commands=()
+
+  for command_name in "${REQUIRED_SYSTEM_COMMANDS[@]}"; do
+    if ! command_exists "$command_name"; then
+      # If command is not found, add it to the missing list.
+      missing_commands+=("$command_name")
+    else
+      log_success "'$command_name' found:  ($(command -v "$command_name"))"
+    fi
+  done
+  if [[ ${#missing_commands[@]} -gt 0 ]]; then
+    log_error "Required command(s) missing: ${missing_commands[*]}"
+  fi
 }
 
-# Checks if the script is running on a macOS computer.
-check_macos() {
-  # Get the computer's chip type (like 'arm64' or 'x86_64').
-  # '$(...)' runs the command inside and captures its output.
-  UNAME_MACHINE="$(/usr/bin/uname -m)"
-  # Check if the chip type is NOT 'arm64' AND NOT 'x86_64'.
-  if [[ "${UNAME_MACHINE}" != "arm64" ]] && [[ "${UNAME_MACHINE}" != "x86_64" ]]; then
-    log_error "This script is only for macOS. Detected: $(uname)"
+check_operating_system_and_architecture() {
+  log_info "Checking operating system and architecture..."
+  # Check if the Operating System is macOS ('Darwin').
+  # 'uname -s' gets the OS name.
+  local system="$(/usr/bin/uname -s)"
+  if [[ "$system" != "Darwin" ]]; then
+    log_error "This script is designed for macOS only. Detected OS: $system"
   fi
-  # Set the correct Homebrew path based on the chip type.
-  if [[ "${UNAME_MACHINE}" == "arm64" ]]; then
-    HOMEBREW_PATH="$ARM_BREW_PATH"  # Use ARM path
+  log_debug "Operating system confirmed as macOS (Darwin)."
+  # Get the macOS version number.
+  local os_version
+  # 'sw_vers -productVersion' gets the version (e.g., "14.4.1").
+  os_version=$(sw_vers -productVersion) || os_version="Unknown"
+  log_debug "Detected macOS version: $os_version"
+  # Find out the chip architecture.
+  # 'uname -m' gets the hardware name (e.g., "arm64", "x86_64").
+  PROCESSOR_ARCHITECTURE="$(/usr/bin/uname -m)"
+  log_debug "Detected ${PROCESSOR_ARCHITECTURE} architecture."
+  case "$PROCESSOR_ARCHITECTURE" in
+  arm64)
+    HOMEBREW_PATH="$ARM_HOMEBREW_PATH" # Expected Homebrew location
     CHIP_TYPE="Apple Silicon"
-  else
-    HOMEBREW_PATH="$INTEL_BREW_PATH"  # Use Intel path
+    log_debug "Architecture is arm64 (Apple Silicon). Expecting Homebrew at $HOMEBREW_PATH."
+    ;;
+  x86_64)
+    HOMEBREW_PATH="$INTEL_HOMEBREW_PATH" # Expected Homebrew location
     CHIP_TYPE="Intel Processor"
-  fi
-  # 'sw_vers -productVersion' gets the macOS version number.
-  log_success "macOS: version $(sw_vers -productVersion) ($CHIP_TYPE)"
+    log_debug "Architecture is x86_64 (Intel). Expecting Homebrew at $HOMEBREW_PATH."
+    ;;
+  *)
+    log_error "Unsupported processor architecture: '$PROCESSOR_ARCHITECTURE'. This script supports arm64 (Apple Silicon) and x86_64 (Intel)."
+    ;;
+  esac
+
+  log_success "System validated: macOS Version $os_version ($CHIP_TYPE)"
 }
 
 # Checks if the computer is connected to the internet.
-check_internet() {
-  log_info "Checking internet connectivity"
-  # List of websites to try reaching.
-  local domains=("www.google.com" "www.apple.com" "github.com")
-  # Loop through each website in the list.
-  for domain in "${domains[@]}"; do
+# Tries to 'ping' a few reliable websites. Stops with error if none work.
+check_internet_connectivity() {
+  log_info "Checking internet connectivity..."
+  for domain in "${CHECK_DOMAINS[@]}"; do
+    log_debug "Attempting to ping $domain..."
     # Try to 'ping' (send a small test message) to the website.
     # '-c 1' sends 1 ping. '-W 3' waits 3 seconds for reply. '&>/dev/null' hides output.
     if ping -c 1 -W 3 "$domain" &>/dev/null; then
-      log_success "Internet connection OK"
-      return 0  # Found connection, stop checking.
+      log_success "Internet connection 'OK'"
+      return 0 # Found connection, stop checking.
     fi
   done
-  # If none of the websites could be reached.
   log_error "No internet connection detected. Please check your network."
 }
 
-# Finds out which command shell (like bash or zsh) is being used and finds its settings file.
-detect_shell() {
-  log_info "Detecting shell configuration"
-
-  # Find the name of the current shell (like 'bash' or 'zsh').
-  # '${SHELL:-/bin/bash}' uses the SHELL variable if set, otherwise defaults to /bin/bash.
-  # 'basename' removes the path, leaving just the filename.
+# Figures out which shell (bash or zsh) the user has and where its settings file is.
+determine_shell_and_profile() {
+  log_info "Detecting user shell and profile file..."
   CURRENT_SHELL="$(basename "${SHELL:-/bin/bash}")"
-
-  # Check which shell it is and set the correct profile file path.
+  log_debug "Detected shell command based on \$SHELL: $CURRENT_SHELL"
   case "$CURRENT_SHELL" in
-    zsh)
-      SHELL_PROFILE_FILE="${ZDOTDIR:-$HOME}/$ZSH_CONF_FILE"
-      MISE_SHELL="zsh"
-      log_success "Detected shell: zsh"
-      echo "   Using profile: ${SHELL_PROFILE_FILE}"
-      ;;
-    bash)
-      SHELL_PROFILE_FILE="$HOME/$BASH_CONF_FILE"
-      MISE_SHELL="bash"
-      log_success "Detected shell: bash"
-      echo "   Using profile: ${SHELL_PROFILE_FILE}"
-      ;;
-    *) # If it's not zsh or bash
-      log_error "Unsupported shell: '$CURRENT_SHELL'. This script requires bash or zsh."
-      ;;
+  zsh)
+    SHELL_PROFILE_FILE="${ZDOTDIR:-$HOME}/$ZSH_PROFILE_BASENAME"
+    MISE_SHELL_TYPE="zsh"
+    ensure_shell_profile_exists_and_writable "ZSH profile file"
+    log_success "Detected shell: zsh"
+    log_debug "Zsh profile file determined as: $SHELL_PROFILE_FILE"
+    ;;
+  bash)
+    SHELL_PROFILE_FILE="$HOME/$BASH_PROFILE_BASENAME"
+    MISE_SHELL_TYPE="bash"
+    ensure_shell_profile_exists_and_writable "BASH profile file"
+    log_success "Detected shell: bash"
+    log_debug "Bash profile file determined as: $SHELL_PROFILE_FILE"
+    ;;
+  *)
+    log_error "Unsupported shell detected: '$CURRENT_SHELL'. This script currently only suppourts bash and zsh."
+    ;;
   esac
-
-  # Check if the determined profile file exists.
-  # '! -e "$file"' means "if file does NOT exist".
-  if [[ ! -e "$SHELL_PROFILE_FILE" ]]; then
-    log_info "Creating shell profile file: ${SHELL_PROFILE_FILE}"
-    # Try to create the file. Stop if it fails.
-    touch "$SHELL_PROFILE_FILE" || log_error "Failed to create shell profile file: ${SHELL_PROFILE_FILE}"
-  # If the file exists, check if we can write to it.
-  # '! -w "$file"' means "if file is NOT writable".
-  elif [[ ! -w "$SHELL_PROFILE_FILE" ]]; then
-    log_warning "Shell profile file is not writable: ${SHELL_PROFILE_FILE}"
-    chmod u+w "$SHELL_PROFILE_FILE" || log_error "Failed to modify permissions for $SHELL_PROFILE_FILE"
-  fi
+  log_info "Using profile: $SHELL_PROFILE_FILE"
+  log_debug "Mise shell type for activation set to: $MISE_SHELL_TYPE"
 }
+# ========================================================================
 
-# Checks if all the needed basic commands are installed.
-check_required_commands() {
-  log_info "Checking for required commands"
-  local required_commands=("$@") # Get the list of commands to check.
-  local missing_commands=()
-  
-  for cmd in "${required_commands[@]}"; do
-    if ! command_exists "$cmd"; then
-      # If command is not found, add it to the missing list.
-      missing_commands+=("$cmd")
-    else
-      log_success "Command found: $cmd ($(command -v "$cmd"))"
-    fi
-  done
-  
-  # After checking all commands, see if the 'missing_commands' list has anything in it.
-  # '${#missing_commands[@]}' gives the number of items in the list.
-  # '-gt 0' means "greater than 0".
-  if [[ ${#missing_commands[@]} -gt 0 ]]; then
-    # If the list is not empty, show an error with the names of missing commands and stop.
-    # '${missing_commands[*]}' joins the list items into a single string.
-    log_error "Required command(s) not found: ${missing_commands[*]}. Please install them first."
-  fi
-}
+# ========================= INSTALLATION HELPERS =========================
 
-# Shows a loading animation while a command runs in the background.
-install_progress_indicator() {
-  local package_name="$1"  # Name of the thing being installed (e.g., "Homebrew").
-  local pid="$2"           # The Process ID (PID) of the installation running in the background.
-  local spin='-\|/'        # Characters for the spinning animation.
-  local i=0                # Counter for the spinner character.
+# Shows a spinning character animation (like - \ | /) while another command runs in the background.
+progress_indicator() {
+  local task_name="$1"      # Name of the task (e.g., "Homebrew").
+  local background_pid="$2" # Process ID (PID) of the background task.
+  local critical="${3:-false}"
+  local spin_chars='-\|/' # Characters for the spinner animation.
+  local i=0               # Counter for which character to show.
+  log_debug "Starting progress indicator for PID $background_pid (Task: $task_name)"
 
   # Keep spinning as long as the background process is still running.
   # 'kill -0 $pid' checks if the process exists without stopping it. '2>/dev/null' hides errors.
-  while kill -0 $pid 2>/dev/null; do
-    i=$(( (i+1) %4 ))  # Cycle through the 4 spinning characters.
+  while kill -0 $background_pid 2>/dev/null; do
+    i=$(((i + 1) % 4)) # Cycle through the 4 spinning characters.
     # '\r' moves the cursor back to the start of the line to overwrite.
     # '${spin:$i:1}' gets one character from the 'spin' string at position 'i'.
-    printf "\r Installing %s %c " "$package_name" "${spin:$i:1}"
-    sleep .1  # Wait a very short time (0.1 seconds) before the next spin update.
+    printf "\r %s %c " "$task_name" "${spin_chars:$i:1}"
+    sleep 0.1 # Wait a very short time (0.1 seconds) before the next spin update.
   done
   # After the process finishes, clear the spinning line
   printf "\r                                   \r"
 
+  local exit_status=0
   # 'wait $pid' waits for the background process to fully finish and gets its exit code.
   # The exit code tells us if the process succeeded (0) or failed (non-zero).
-  wait $pid
+  wait "$background_pid" || exit_status=$?
+
+  log_debug "PID $background_pid ($task_name) finished with exit status $exit_status."
+
   # Check if the background process finished successfully (exit code 0).
-  if [ $? -eq 0 ]; then
-    log_success "$package_name installation successful"
+  if [ $exit_status -eq 0 ]; then
+    task_name=$(echo "$task_name" | sed 's/Downloading /downloaded /; s/Unzipping /unzipped /; s/Installing /installed /; s/Searching for /found /; s/Homebrew Update/updated Homebrew/')
+    log_success "Successfully $task_name"
   else
-    log_error "$package_name installation failed. Check the log file: $LOG_FILE"
+    task_name=$(echo "$task_name" | sed 's/Downloading /Download /; s/Unzipping /Unzip /; s/Installing /Install /; s/Searching for /find /; s/Homebrew Update/update Homebrew/')
+    if [[ "$critical" == "critical" ]]; then
+      log_error "Failed to $task_name. Check the log file: $LOG_FILE"
+    else
+      log_warning "Failed to $task_name. Check the log file: $LOG_FILE"
+    fi
   fi
 }
 
-setup_homebrew() {
-  log_info "Detecting Homebrew"
+# ========================================================================
+
+# ===========================  HOMEBREW SETUP  ===========================
+
+install_homebrew_if_missing() {
+  log_info "Checking for Homebrew..."
   if [[ -x "$HOMEBREW_PATH" ]]; then
     log_success "Homebrew already installed"
     log_debug "Found Homebrew at $HOMEBREW_PATH"
-  else
-      # If Homebrew is not found, install it.
-      log_info "Homebrew not found. Installing (password required)... Buckle in, this will take a while."
-      
-      log_debug "Requesting sudo privileges before Homebrew installer"
-      # HACK to run NONINTERACTIVE installer
-      sudo -v || log_error "Failed to get sudo privileges"
-      
-      log_debug "Running Homebrew installer"
-      # 'NONINTERACTIVE=1' makes it run without asking questions.
-      # '/bin/bash -c "..."' runs the commands inside the quotes using bash.
-      # '$(curl -fsSL ...)' downloads the script content. '-f' fail fast, '-s' silent, '-S' show error, '-L' follow redirects.
-      # '>> "$LOG_FILE" 2>&1' sends all output (normal and error) to the log file.
-      # '&' runs the command in the background.
-      (NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" >> "$LOG_FILE" 2>&1) &
-      installer_pid=$!  # Get the Process ID (PID) of the background installer. '$!' holds the PID of the last background command.
-      # Show the spinning progress indicator while it installs.
-      install_progress_indicator "Homebrew" $installer_pid
-
-
-      log_info "Verifying Homebrew installation"
-      # Check if Homebrew binaries are executable after installation attempt.
-      if [[ -x "$HOMEBREW_PATH" ]]; then
-        log_success "Found Homebrew at '$HOMEBREW_PATH'"
-      else
-        log_error "Could not find Homebrew binaries after installation."
-      fi
-
+    return 0
   fi
-  
-  # --- Configure Homebrew in Shell Profile ---
-  BREW_SHELLENV_LINE="eval \"\$(${HOMEBREW_PATH} shellenv)\""
-  add_line_if_missing "$BREW_SHELLENV_LINE" "$SHELL_PROFILE_FILE" || log_error "Failed to update shell profile with Homebrew configuration"
+  log_info "Homebrew not found. Installing (password required)... Buckle in, this will take a while."
+  if ! sudo -v; then
+    log_error "Failed to obtain sudo privileges, which are required for Homebrew installation. Please run the script again and provide the password when prompted."
+  fi
+  log_debug "Starting Homebrew installer"
+  (NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL "$HOMEBREW_INSTALL_URL")" >>"$LOG_FILE" 2>&1) &
+  local installer_pid=$! # Get the PID of the background installer.
 
-  # --- Initialize Homebrew for the current script session ---
-  log_debug "Initializing Homebrew in current session"
-  eval "$(${HOMEBREW_PATH} shellenv)" || log_error "Failed to initialize Homebrew in current session"
+  # Show the spinning progress animation while it installs.
+  progress_indicator "Installing Homebrew" "$installer_pid" "critical"
+  log_info "Verifying Homebrew installation..."
+  if [[ -x "$HOMEBREW_PATH" ]]; then
+    log_success "Homebrew successfully installed at '$HOMEBREW_PATH'."
+  fi
+}
 
-  # Double-check that the 'brew' command is now available.
+configure_homebrew_shell_environment() {
+  log_info "Configuring shell environment for Homebrew..."
+  if [[ ! -x "$HOMEBREW_PATH" ]]; then
+    log_error "Homebrew executable not found at '$HOMEBREW_PATH'. Cannot configure shell environment. Run installation step first."
+  fi
+  ensure_shell_profile_exists_and_writable
+  local brew_shellenv_line="eval \"\$(\"${HOMEBREW_PATH}\" shellenv)\""
+  log_debug "Homebrew shellenv line to add/check in profile: $brew_shellenv_line"
+  if ! add_line_if_missing "$brew_shellenv_line" "$SHELL_PROFILE_FILE"; then
+    log_error "Failed to add Homebrew shellenv configuration to '$SHELL_PROFILE_FILE'."
+  fi
+  log_debug "Activating Homebrew environment for the current script session..."
+  if ! eval "$($HOMEBREW_PATH shellenv)"; then
+    log_error "Failed to activate Homebrew environment in the current session using 'eval \$($HOMEBREW_PATH shellenv)'. The 'brew' command might not work correctly in this script run. Check permissions and Homebrew installation."
+  fi
   if ! command_exists brew; then
-    log_error "Could not find Homebrew command."
+    log_error "Homebrew shell environment was configured in profile, but 'brew' command is still not found in the current session's PATH. This indicates an unexpected issue. Check '$SHELL_PROFILE_FILE' and potentially restart your terminal."
   fi
+  log_debug "Verified 'brew' command is now available in PATH: $(command -v brew)"
+  log_success "Found Homebrew at '$HOMEBREW_PATH'"
+}
 
+update_and_configure_homebrew() {
+  log_info "Updating Homebrew and applying configurations..."
+  if ! command_exists brew; then
+    log_error "'brew' command not found. Cannot update Homebrew. Ensure previous setup steps succeeded."
+  fi
   log_success "Homebrew is ready to brew"
-
-  # --- Configure Homebrew Settings ---
-  log_info "Configuring Homebrew"
-  log_debug "Disabling Homebrew analytics"
-  # Tell Homebrew not to send usage data.
-  # '>> "$LOG_FILE" 2>&1' sends output/errors to log.
-  # '|| log_warning ...' shows a warning if the command fails, but doesn't stop the script.
-  brew analytics off >> "$LOG_FILE" 2>&1 || log_warning "Failed to disable Homebrew analytics"
-
-  # --- Update Homebrew ---
-  log_info "Updating Homebrew"
-  log_debug "Running brew update"
-  # 'brew update' downloads the latest list of available software.
-  # If update fails ('! ...'), show a warning but continue.
-  if ! brew update >> "$LOG_FILE" 2>&1; then
-    log_warning "Failed to update Homebrew. Continuing with potentially outdated package information."
-  fi
-  log_success "Homebrew is up to date"
-}
-
-install_package_if_missing() {
-  local package="$1"
-
-  log_debug "Checking package: $package"
-  # 'brew list "$package"' checks if the package is installed.
-  # '&>/dev/null' hides the output/error from 'brew list'.
-  # '!' reverses the result: "if package is NOT listed".
-  if ! brew list "$package" &>/dev/null; then
-    log_info "Installing $package..."
-    # Install the package using 'brew install'.
-    # Run in the background ('&') and send output to log file ('>> ... 2>&1').
-    (brew install "$package" >> "$LOG_FILE" 2>&1) &
-    installer_pid=$!  # Get the process ID of the background installation.
-    # Show the spinning progress indicator.
-    install_progress_indicator "$package" $installer_pid
+  log_debug "Attempting to disable Homebrew analytics using 'brew analytics off'..."
+  if brew analytics off >>"$LOG_FILE" 2>&1; then
+    log_debug "Successfully disabled Homebrew analytics."
   else
-    # If 'brew list' succeeded, the package is already installed.
-    log_success "$package is already installed"
+    log_debug "Could not disable Homebrew analytics (command failed). This is non-critical. Continuing..."
+  fi
+  log_info "Updating Homebrew package database (this may take a moment)..."
+  log_debug "Running 'brew update'..."
+  (brew update >>"$LOG_FILE" 2>&1) &
+  local update_pid=$! # Get the PID of the background update process.
+  progress_indicator "Homebrew Update" "$update_pid"
+}
+
+setup_homebrew_environment() {
+  install_homebrew_if_missing          # Step 1: Install if needed.
+  configure_homebrew_shell_environment # Step 2: Set up shell environment.
+  update_and_configure_homebrew        # Step 3: Update and configure.
+}
+
+# ========================================================================
+
+# ========================== TOOL INSTALLATION ===========================
+
+install_homebrew_package_if_missing() {
+  local package_name="$1" # Get the tool name.
+  log_info "Checking for package: $package_name"
+  if ! command_exists brew; then
+    log_error "'brew' command not found. Cannot continue."
+  fi
+  log_debug "Checking if '$package_name' is installed via 'brew list $package_name'..."
+  if brew list "$package_name" >/dev/null 2>&1; then
+    log_success "$package_name is already installed"
+  else
+    log_info "Installing $package_name..."
+    (brew install "$package_name" >>"$LOG_FILE" 2>&1) &
+    local installer_pid=$!
+    progress_indicator "Installing '$package_name'" "$installer_pid"
+  fi
+  return 0
+}
+
+verify_installed_tools() {
+  if [[ -z "$INSTALLED_TOOLS_TO_VERIFY" ]]; then
+    log_error "Missing tools to verify."
+  fi
+  echo
+  log_info "Verifying packages installation..."
+  local missing_tools=()
+  for tool_name in "${INSTALLED_TOOLS_TO_VERIFY[@]}"; do
+    log_debug "Verifying command: $tool_name"
+    if ! command_exists "$tool_name"; then
+      missing_tools+=("$tool_name")
+    else
+      log_success "$tool_name is available"
+    fi
+  done
+  if [[ ${#missing_tools[@]} -gt 0 ]]; then
+    log_error "Critical tool(s) '${missing_tools[*]}' are missing. Please install them."
   fi
 }
 
-install_packages() {
-  log_info "Installing required packages"
-  
-  local packages=("$@")
-  
-  for pkg in "${packages[@]}"; do
-    install_package_if_missing "$pkg"
-  done
-}
-
-verify_tools() {
-  log_info "Verifying packages installation"
-  local tools=("$@")
-  
-  for tool in "${tools[@]}"; do
-    if ! command_exists "$tool"; then
-      log_error "Critical tool '$tool' is missing. Please install it."
-    else
-      log_success "$tool is available"
+install_required_packages() {
+  if [[ -z "$HOMEBREW_PACKAGES_TO_INSTALL" ]]; then
+    log_error "No packages set to install."
+  fi
+  echo
+  log_info "Installing required packages..."
+  for package_name in "${HOMEBREW_PACKAGES_TO_INSTALL[@]}"; do
+    if ! install_homebrew_package_if_missing "$package_name"; then
+      log_warning "Installation failed for package '$package_name'. Check logs."
     fi
   done
 }
 
-configure_mise() {
-  log_info "Configuring MISE"
-  # Find where the 'mise' command is installed.
-  MISE_BIN="$(command -v mise)"
-  
-  # Check if 'mise' was found.
-  # '-z "$VAR"' checks if the variable VAR is empty.
-  if [[ -z "$MISE_BIN" ]]; then
-    log_error "mise command not found after installation."
+# ========================================================================
+
+# =========================== MISE & JAVA SETUP ==========================
+
+configure_mise_environment() {
+  if [[ -z "$MISE_SHELL_TYPE" ]]; then
+    log_error "Mise shell type (MISE_SHELL_TYPE) not set. Cannot configure mise environment."
   fi
-  
-  log_debug "mise found at $MISE_BIN"
+  ensure_shell_profile_exists_and_writable
+  echo
+  log_info "Configuring 'mise'..."
 
-  # This line sets up 'mise' to work with your shell (zsh or bash).
-  # It needs to be added to your shell profile file.
-  MISE_ACTIVATE_LINE="eval \"\$(${MISE_BIN} activate ${MISE_SHELL})\""
-  # Add the line if missing. Show warning if adding fails, but don't stop.
-  add_line_if_missing "$MISE_ACTIVATE_LINE" "$SHELL_PROFILE_FILE" || log_warning "Failed to update shell profile with mise configuration"
-
-  # Activate 'mise' for the current script session.
-  # '> /dev/null' hides the output. Stop with error if activation fails ('||').
-  "$MISE_BIN" activate > /dev/null || log_error "Failed to activate mise in current session"
-}
-
-install_java() {
-  log_debug "Checking for latest Java version"
-
-  # Ask 'mise' for the latest available version number of the package named in $JDK (java@openjdk).
-  # '2>> "$LOG_FILE"' sends any error messages from 'mise latest' to the log file.
-  # If the command fails ('||'), stop with an error.
-  LATEST_JDK=$("$MISE_BIN" latest "$JDK" 2>> "$LOG_FILE") || log_error "Failed to determine latest Java version"
-
-  # Check if we got a version number.
-  if [[ -z "$LATEST_JDK" ]]; then
-    log_error "Failed to determine latest Java version."
+  # Find where the 'mise' command is located.
+  if ! command_exists "mise"; then
+    log_error "'mise' command not found. Cannot configure mise environment. Ensure mise setup was successful."
   fi
-  
-  log_debug "Latest Java version: $LATEST_JDK"
-  log_info "Installing Java $LATEST_JDK"
-  
-  log_debug "Running: mise install java@${LATEST_JDK}"
-  # Tell 'mise' to install this specific Java version.
-  # Run in the background ('&') and send output to log file.
-  ("$MISE_BIN" install "java@${LATEST_JDK}" >> "$LOG_FILE" 2>&1) &
-  installer_pid=$!  # Get process ID.
-  # Show progress indicator.
-  install_progress_indicator "Java $LATEST_JDK" $installer_pid
+  local mise_executable="$(command -v mise)"
 
-  log_debug "Setting Java ${LATEST_JDK} as global"
-  # Tell 'mise' to make this Java version the default one for the whole system ('--global').
-  # If setting global fails ('! ...'), stop with an error.
-  if ! "$MISE_BIN" use --global "java@${LATEST_JDK}" >> "$LOG_FILE" 2>&1; then
-    log_error "Failed to set Java ${LATEST_JDK} as global version"
+  log_debug "mise executable found at: $mise_executable"
+
+  local mise_activate_line="eval \"\$(${mise_executable} activate ${MISE_SHELL_TYPE})\""
+  log_debug "mise activation line to add/check in profile: $mise_activate_line"
+
+  # Add this line to the profile file if it's not there.
+  if ! add_line_if_missing "$mise_activate_line" "$SHELL_PROFILE_FILE"; then
+    log_error "Failed to add mise activation line to '$SHELL_PROFILE_FILE'."
   fi
 
-  log_success "Set Java ${LATEST_JDK} as global version"
-  
-  log_info "Verifying Java OpenJDK installation"
-  # Try running 'java -version' using 'mise exec' (which ensures the mise-managed version is used).
-  # Send output to log file.
-  if "$MISE_BIN" exec -- java -version >> "$LOG_FILE" 2>&1; then
-    # If successful, get the first line of the version output to show the user.
-    # '2>&1' sends error stream to normal output stream. '| head -n 1' takes only the first line.
-    JAVA_VERSION=$("$MISE_BIN" exec -- java -version 2>&1 | head -n 1)
-    log_debug "Java: $JAVA_VERSION"
-    log_success "Java ${LATEST_JDK} is ready"
+  # Activate 'mise' for the current script session so we can use it to install Java.
+  log_debug "Activating mise for the current script session..."
+  # Run the activation command using 'eval'. Check if it succeeds.
+  if $mise_executable activate >/dev/null; then
+    log_success "mise environment configured and active for this session."
   else
-    # If verification command failed, show a warning.
-    log_warning "Java ${LATEST_JDK} verification failed."
-    echo "To check manually after restarting your terminal:"
-    echo "  java --version"
+    log_error "Failed to activate mise environment."
   fi
 }
 
-# Tries to find the 'riverSpider' directory, which should contain 'submit.sh'.
-locate_river_spider_dir() {
-  log_info "Locating riverSpider directory"
-  
-  local potential_dir
-  # Search inside the user's home directory ('~') for a file named 'submit.sh'.
-  # 'find ~ ...' starts searching from the home directory.
-  # '-name submit.sh' looks for files with this exact name.
-  # '-type f' means only find files (not directories).
-  # '-exec dirname {} \;' runs the 'dirname' command on each found file path ('{}')
-  #                      to get just the directory part. '\;' ends the -exec command.
-  # '2> /dev/null' hides errors (like "Permission denied" in some folders).
-  # '| grep "/riverSpider$"' filters the results, keeping only lines that end with "/riverSpider".
-  # '| head -n 1' takes only the first matching directory found.
-  potential_dir=$(find ~/ -name submit.sh -type f -exec dirname {} \; 2> /dev/null | grep "/riverSpider$" | head -n 1) || true
-  # Check if a directory path was found ('-n' checks if string is not empty)
-  # AND if that path actually points to a directory ('-d' checks if it's a directory).
-  if ! [[ -n "$potential_dir" && -d "$potential_dir" ]]; then
-    log_error "Could not locate riverSpider. See Canvas for download instructions."
-  fi
-  # Save the found path into the RIVER_SPIDER_DIR variable.
-  # 'export' makes it available in this terminal sessions.
-  export RIVER_SPIDER_DIR="$potential_dir"
-  log_success "Found riverSpider/submit.sh at $potential_dir"
+install_java_with_mise() {
 
-  # Add a line to the shell profile file to remember this path for future terminal sessions.
-  # This line will look like: export RIVER_SPIDER_DIR="/path/to/riverSpider"
-  add_riverspider_to_profile "export RIVER_SPIDER_DIR=\"$RIVER_SPIDER_DIR\""
+  if [[ -z "$JDK_MISE_NAME" ]]; then
+    log_error "JDK version not set."
+  fi
+  echo
+  log_info "Downloading Java..."
+
+  if ! command_exists "mise"; then
+    log_error "'mise' command not found. Cannot install Java. Ensure mise setup was successful."
+  fi
+  local mise_executable="$(command -v mise)"
+
+  log_debug "Using mise executable: $mise_executable"
+
+  # Ask 'mise' for the latest recommended version of OpenJDK.
+  log_debug "Determining latest recommended Java version using 'mise latest $JDK_MISE_NAME'..."
+  local latest_jdk_version=""
+  # Run 'mise latest'. Send errors to log file ('2>>'). Check if command succeeded ('!').
+  if ! latest_jdk_version=$("$mise_executable" latest "$JDK_MISE_NAME" 2>>"$LOG_FILE"); then
+    log_error "Failed to determine the latest Java version. See log: $LOG_FILE"
+  fi
+  # Check if 'mise latest' returned an actual version number.
+  if [[ -z "$latest_jdk_version" ]]; then
+    log_error "Failed to determine the latest Java version. See log: $LOG_FILE"
+  fi
+  log_info "Latest recommended Java version: $latest_jdk_version"
+
+  # Combine the tool name and version (e.g., "java@openjdk@21.0.3").
+  local jdk_tool_version="java@$latest_jdk_version"
+  log_debug "Full tool@version string for mise: $jdk_tool_version"
+
+  # Tell 'mise' to install this Java version.
+  log_debug "Running command: $mise_executable install $jdk_tool_version"
+  # Run in background, send output to log, show progress.
+  ("$mise_executable" install "$jdk_tool_version" >>"$LOG_FILE" 2>&1) &
+  local installer_pid=$!
+
+  progress_indicator "Installing Java $latest_jdk_version" "$installer_pid" "critical"
+
+  log_info "Setting Java $latest_jdk_version as the global default version..."
+  log_debug "Running command: $mise_executable use --global $jdk_tool_version"
+  # Run 'mise use --global'. Send output to log. Check success.
+  if "$mise_executable" use --global "$jdk_tool_version" >>"$LOG_FILE" 2>&1; then
+    log_success "Successfully set Java ${latest_jdk_version} as the global default."
+  else
+    log_error "Failed to set Java ${latest_jdk_version} as the global default. Check log: $LOG_FILE"
+  fi
+
+  # Check if Java works correctly now.
+  log_info "Verifying Java installation..."
+  # Run 'java -version' using 'mise exec' to ensure it uses the mise environment.
+  log_debug "Running command: $mise_executable exec -- java -version"
+  local java_version_output=""
+  if java_version_output=$("$mise_executable" exec -- java -version 2>&1 | head -n 1); then
+    log_success "Java installation verified successfully using 'mise exec'."
+    log_debug "Java: $java_version_output"
+    log_success "Java ${latest_jdk_version} is ready"
+  else
+    log_warning "Java verification failed. Check log: $LOG_FILE"
+    echo "You can try verifying manually after restarting your terminal by running: java -version"
+  fi
 }
 
-add_riverspider_to_profile() {
-  local line_to_set="$1"
-  # This pattern is used to find existing lines that set RIVER_SPIDER_DIR.
-  # '^' means "start of the line".
+# ========================================================================
+
+# ========================== riverSpider SETUP ===========================
+
+clean_up_riverspider_download() {
+  if [ -d "${RIVER_SPIDER_EXTRACT_DIRECTORY}/riverSpider" ]; then
+    log_debug "Moving contents to $RIVER_SPIDER_TARGET_DIRECTORY..."
+    mkdir -p "$RIVER_SPIDER_TARGET_DIRECTORY"
+    mv "${RIVER_SPIDER_EXTRACT_DIRECTORY}/riverSpider/"* "$RIVER_SPIDER_TARGET_DIRECTORY/"
+    rm -rf "$RIVER_SPIDER_EXTRACT_DIRECTORY" "$RIVER_SPIDER_OUTPUT_FILE"
+    log_debug "Extraction and cleanup complete. Files are in $RIVER_SPIDER_TARGET_DIRECTORY"
+    find_river_spider_directory
+  else
+    log_error "Failed to download 'riverSpider'. See Canvas for download instructions."
+  fi
+}
+
+download_and_extract_riverspider() {
+  if [[ -z "$RIVER_SPIDER_OUTPUT_FILE" || -z "$RIVER_SPIDER_ZIP_NAME" || -z "$RIVER_SPIDER_EXTRACT_DIRECTORY" || -z "$RIVER_SPIDER_TARGET_DIRECTORY" ]]; then
+    log_error "Cann't download 'riverSpider'. See Canvas for download instructions."
+  fi
+  log_info "Downloading 'riverSpider'..."
+  (curl -fsSL -o "$RIVER_SPIDER_OUTPUT_FILE" "https://drive.usercontent.google.com/download?id=${RIVER_SPIDER_GOOGLE_DRIVE_FILE_ID}&export=download&confirm=t" >>"$LOG_FILE" 2>&1) &
+  local download_pid=$!
+  progress_indicator "Downloading '${RIVER_SPIDER_ZIP_NAME}'" "$download_pid" "critical"
+
+  mkdir -p "$RIVER_SPIDER_EXTRACT_DIRECTORY"
+  (unzip "$RIVER_SPIDER_OUTPUT_FILE" -d "$RIVER_SPIDER_EXTRACT_DIRECTORY" >>"$LOG_FILE" 2>&1) &
+  local unzip_pid=$!
+  progress_indicator "Unzipping '${RIVER_SPIDER_ZIP_NAME}'" "$download_pid" "critical"
+  sleep 0.1
+  clean_up_riverspider_download
+}
+
+set_river_spider_dir_variable() {
+  ensure_shell_profile_exists_and_writable
+  if [[ -z "$RIVER_SPIDER_DIR" ]]; then
+    log_error "RIVER_SPIDER_DIR variable is not set."
+  fi
+  if [[ ! -d "$RIVER_SPIDER_DIR" ]]; then
+    log_error "RIVER_SPIDER_DIR path '$RIVER_SPIDER_DIR' is not a valid directory."
+  fi
+  export RIVER_SPIDER_DIR
+  log_debug "Exported RIVER_SPIDER_DIR='$RIVER_SPIDER_DIR' for the current script session."
+  local line_to_set="export RIVER_SPIDER_DIR=\"$RIVER_SPIDER_DIR\""
   local pattern_to_find="^export RIVER_SPIDER_DIR="
+  log_debug "Ensuring shell profile ($SHELL_PROFILE_FILE) contains line: $line_to_set"
 
-  # Check if the SHELL_PROFILE_FILE variable is set and if the file exists.
-  # '-z "$VAR"' checks if empty. '! -f "$file"' checks if file does not exist.
-  if [[ -z "$SHELL_PROFILE_FILE" || ! -f "$SHELL_PROFILE_FILE" ]]; then
-    log_warning "Please add this line to your shell profile:" 
-    echo "$line_to_set"
   # Check if a line matching the pattern already exists in the profile file.
   # 'grep -q' searches quietly.
-  elif grep -q "$pattern_to_find" "$SHELL_PROFILE_FILE"; then
-    if [[ ! -w "$SHELL_PROFILE_FILE" ]]; then
-      log_warning "Shell profile file is not writable: $SHELL_PROFILE_FILE"
-      chmod u+w "$SHELL_PROFILE_FILE" || log_error "Failed to modify permissions for $SHELL_PROFILE_FILE"
-    fi
+  if grep -q "$pattern_to_find" "$SHELL_PROFILE_FILE"; then
     # If it exists, replace the old line with the new one using 'sed'.
     # 'sed -i''' modifies the file directly (the '' is needed for macOS compatibility).
     # '-e' specifies the command to run.
@@ -511,75 +700,127 @@ add_riverspider_to_profile() {
     # '#' is used as the separator instead of '/' because the path contains '/'.
     # '.*' matches the rest of the existing line.
     # If sed fails ('||'), show a warning.
-    sed -i'' -e "s#${pattern_to_find}.*#${line_to_set}#" "$SHELL_PROFILE_FILE" || 
+    sed -i'' -e "s#${pattern_to_find}.*#${line_to_set}#" "$SHELL_PROFILE_FILE" ||
       log_warning "Could not add RIVER_SPIDER_DIR to $SHELL_PROFILE_FILE. Add manually: $line_to_set"
   else
     # If the line doesn't exist, add it to the end of the file.
     # '{ echo ""; ...; echo ""; } >> file' appends the lines inside {} to the file.
     # Adds blank lines before and after for spacing.
     # If appending fails ('||'), show a warning.
-    { echo ""; echo "$line_to_set"; echo "";} >> "$SHELL_PROFILE_FILE" || 
-      log_warning "Could not add RIVER_SPIDER_DIR to $SHELL_PROFILE_FILE. Add manually: $line_to_set"
+    {
+      echo ""
+      echo "$line_to_set"
+      echo ""
+    } >>"$SHELL_PROFILE_FILE" ||
+      log_warning "Could not add RIVER_SPIDER_DIR to $SHELL_PROFILE_FILE."
+  fi
+}
+
+# Tries to find the 'riverSpider' directory, which should contain 'submit.sh'.
+find_river_spider_directory() {
+  if ! command_exists fd; then
+    log_error "'fd' command not found. Cannot search for 'riverSpider' directory. Ensure 'fd' is installed."
+  fi
+  local temp_file
+  local search_pid
+  temp_file=$(mktemp) || log_error "Failed to create temporary file for search."
+  log_info "Attempting to locate the riverSpider project directory..."
+  log_debug "Searching within '$HOME' for a directory named 'riverSpider' containing '$SUBMIT_SCRIPT_NAME'..."
+  (fd --type f "$SUBMIT_SCRIPT_NAME" "$HOME" --exec dirname {} \; | grep --color=never "/riverSpider$" | head -n 1 >"$temp_file") &
+  search_pid=$!
+  progress_indicator "Searching for 'riverSpider' directory" "$search_pid"
+  local potential_dir
+  potential_dir=$(<"$temp_file")
+  # Check if a directory path was found ('-n' checks if string is not empty)
+  # AND if that path actually points to a directory ('-d' checks if it's a directory).
+  if ! [[ -n "$potential_dir" && -d "$potential_dir" ]]; then
+    download_and_extract_riverspider
+  elif [[ "$potential_dir" == "${RIVER_SPIDER_EXTRACT_DIRECTORY}/riverSpider" ]]; then
+    clean_up_riverspider_download
+  else
+    log_success "Found 'riverSpider' at $potential_dir"
+    RIVER_SPIDER_DIR="$potential_dir"
+  fi
+  ensure_file_writable "${RIVER_SPIDER_DIR}/${SECRET_FILE_NAME}" "${SECRET_FILE_NAME}"
+  echo "$TTPASM_APP_SCRIPT_DEFAULT_PASSWD" >"${RIVER_SPIDER_DIR}/${SECRET_FILE_NAME}"
+}
+
+update_path_in_submit_script() {
+  if [[ -z "$RIVER_SPIDER_DIR" || ! -d "$RIVER_SPIDER_DIR" ]]; then
+    log_error "RIVER_SPIDER_DIR ('${RIVER_SPIDER_DIR}') is not set or invalid. Cannot update submit script. Ensure project location was found."
+  fi
+  if [[ -z "$SUBMIT_SCRIPT_NAME" ]]; then
+    log_error "SUBMIT_SCRIPT_NAME ('${SUBMIT_SCRIPT_NAME}') is not set or invalid. Cannot update submit script. Ensure project location was found."
+  fi
+  local submit_script_path="${RIVER_SPIDER_DIR}/${SUBMIT_SCRIPT_NAME}"
+  ensure_file_writable "$submit_script_path" "${SUBMIT_SCRIPT_NAME}"
+  local old_line_pattern="$1" # The exact old line text
+  local new_line_content="$2" # The new line text
+  local path_description="$3"
+
+  log_debug "Attempting to update ${submit_script_path}"
+  log_debug "  Old line expected: '${old_line_pattern}'"
+  log_debug "  New line content: '${new_line_content}'"
+  if grep -Fxq -- "${new_line_content}" "${submit_script_path}"; then
+    log_success " - ${path_description} path appears to be already correctly set in ${SUBMIT_SCRIPT_NAME}."
+    return 0
+  fi
+  if grep -Fxq -- "${old_line_pattern}" "${submit_script_path}"; then
+    log_debug "Found the expected original line for '${path_description}'. Replacing it."
+    if sed -i '' -e "s#${old_line_pattern}#${new_line_content}#" "$submit_script_path"; then
+      if ! grep -Fxq -- "$new_line_content" "$submit_script_path"; then
+        log_warning " - Couldn't update path for '${path_description}' in ${SUBMIT_SCRIPT_NAME}."
+        return 1
+      fi
+      log_success " - Updated path for '${path_description}' in ${SUBMIT_SCRIPT_NAME}."
+    else
+      log_warning " - Couldn't update path for '${path_description}' in ${SUBMIT_SCRIPT_NAME}."
+      return 1
+    fi
+  else
+    log_warning " - Could not find '${path_description}' in '${SUBMIT_SCRIPT_NAME}'"
+    return 1
   fi
 }
 
 # Changes relative paths (like 'secretString.txt') inside the submit.sh script
 # to absolute paths (like '/Users/you/riverSpider/secretString.txt').
-update_riverspider_paths() {
- log_info "Configuring riverSpider"
- 
- # Check if the RIVER_SPIDER_DIR variable is set.
- if [[ -z "$RIVER_SPIDER_DIR" ]]; then
-   log_error "RIVER_SPIDER_DIR environment variable is not set."
- fi
- 
- # Construct the full path to the submit.sh script.
- local submit_script="$RIVER_SPIDER_DIR/submit.sh"
+update_paths_in_riverspider_submit_script() {
+  if [[ -z "$RIVER_SPIDER_DIR" || ! -d "$RIVER_SPIDER_DIR" ]]; then
+    log_error "RIVER_SPIDER_DIR ('$RIVER_SPIDER_DIR') is not set or invalid. Cannot update submit script. Ensure project location was found."
+  fi
+  if [[ -z "$SUBMIT_SCRIPT_NAME" ]]; then
+    log_error "SUBMIT_SCRIPT_NAME ('$SUBMIT_SCRIPT_NAME') is not set or invalid. Cannot update submit script. Ensure project location was found."
+  fi
+  ensure_file_writable "${RIVER_SPIDER_DIR}/${SUBMIT_SCRIPT_NAME}" "${SUBMIT_SCRIPT_NAME}"
+  echo
+  log_info "Updating paths in the riverSpider submit script..."
+  local new_secrets_path_line="secretPath=\"${RIVER_SPIDER_DIR}/${SECRET_FILE_NAME}\""
+  local new_webapp_url_path_line="webappUrlPath=\"${RIVER_SPIDER_DIR}/${WEBAPP_URL_FILE_NAME}\""
+  local new_logisim_jar_path_line="logisimPath=\"${RIVER_SPIDER_DIR}/${LOGISIM_JAR_FILE_NAME}\""
+  local new_processor_circ_path_line="processorCircPath=\"${RIVER_SPIDER_DIR}/${PROCESSOR_CIRC_FILE_NAME}\""
+  local new_urlencode_sed_path_line="urlencodeSedPath=\"${RIVER_SPIDER_DIR}/${URLENCODE_SED_FILE_NAME}\""
 
- # Check if the submit.sh script exists.
- if [[ ! -f "$submit_script" ]]; then
-   log_error "Submit script not found at $submit_script"
- fi
+  update_path_in_submit_script "$OLD_SECRETS_PATH_LINE" "$new_secrets_path_line" "Secret File"
+  update_path_in_submit_script "$OLD_WEBAPP_URL_PATH_LINE" "$new_webapp_url_path_line" "WebApp URL File"
+  update_path_in_submit_script "$OLD_LOGISIM_JAR_PATH_LINE" "$new_logisim_jar_path_line" "Logisim"
+  update_path_in_submit_script "$OLD_PROCESSOR_CIRC_PATH_LINE" "$new_processor_circ_path_line" "Processor Circuit"
+  update_path_in_submit_script "$OLD_URLENCODE_SED_PATH_LINE" "$new_urlencode_sed_path_line" "URLEncode Sed Script"
 
- if [[ ! -w "$submit_script" ]]; then
-    log_warning "submit.sh file is not writable: $submit_script"
-    chmod u+w "$submit_script" || log_error "Failed to modify permissions for $submit_script"
- fi
-
-# --- Define the NEW lines with absolute paths ---
- # These use the $RIVER_SPIDER_DIR variable found earlier.
- NEW_SECRETS_LINE="secretPath=\"${RIVER_SPIDER_DIR}/secretString.txt\""
- NEW_WEBAPP_LINE="webappUrlPath=\"${RIVER_SPIDER_DIR}/webapp.url\""
- NEW_LOGISIM_LINE="logisimPath=\"${RIVER_SPIDER_DIR}/logisim310.jar\""
- NEW_PROC_LINE="processorCircPath=\"${RIVER_SPIDER_DIR}/processor0004.circ\""
- NEW_URLENCODE_LINE="urlencodeSedPath=\"${RIVER_SPIDER_DIR}/urlencode.sed\""
-
- # --- Use 'sed' to replace OLD lines with NEW lines in submit.sh ---
- # 'sed -i''' modifies the file directly. '-e "s#old#new#"' performs substitution.
- # '&& log_success ...' runs log_success only if sed command succeeded (exit code 0).
- # '|| log_warning ...' runs log_warning only if sed command failed (non-zero exit code).
- sed -i'' -e "s#${OLD_SECRETS_LINE}#${NEW_SECRETS_LINE}#" "$submit_script" && log_success " - Updated secretPath" || log_warning " - FAILED to update secretPath"
- sed -i'' -e "s#${OLD_WEBAPP_LINE}#${NEW_WEBAPP_LINE}#" "$submit_script" && log_success " - Updated webappUrlPath" || log_warning " - FAILED to update webappUrlPath"
- sed -i'' -e "s#${OLD_LOGISIM_LINE}#${NEW_LOGISIM_LINE}#" "$submit_script" && log_success " - Updated logisimPath" || log_warning " - FAILED to update logisimPath"
- sed -i'' -e "s#${OLD_PROC_LINE}#${NEW_PROC_LINE}#" "$submit_script" && log_success " - Updated processorCircPath" || log_warning " - FAILED to update processorCircPath"
- sed -i'' -e "s#${OLD_URLENCODE_LINE}#${NEW_URLENCODE_LINE}#" "$submit_script" && log_success " - Updated urlencodeSedPath" || log_warning " - FAILED to update urlencodeSedPath"
-
- log_success "Updated paths in $submit_script"
 }
 
 # Adds a new, easy-to-use command 'riverspider' to your shell profile file.
 # This command makes running the main submit.sh script simpler.
-add_river_spider_helper() {
+add_river_spider_shell_helper_function() {
+  ensure_shell_profile_exists_and_writable
+  echo
   log_info "Setting up River Spider helper function..."
-  
-  if [[ ! -w "$SHELL_PROFILE_FILE" ]]; then
-    log_warning "Shell profile file is not writable: $SHELL_PROFILE_FILE"
-    chmod u+w "$SHELL_PROFILE_FILE" || log_error "Failed to modify permissions for $SHELL_PROFILE_FILE"
-  fi
-  if grep -q "riverspider()" "$SHELL_PROFILE_FILE"; then
-    log_success "'riverspider' helper function already in shell profile"
+  local helper_function_name="riverspider"
+
+  if grep -q "${helper_function_name}()" "$SHELL_PROFILE_FILE"; then
+    log_success "'$helper_function_name' helper function already in shell profile"
   else
-    echo "Adding River Spider helper function..."
+    log_info "Adding River Spider helper function..."
     cat <<'EOF' >>"$SHELL_PROFILE_FILE"
 #=======  River Spider helper function =======
 riverspider() {
@@ -629,38 +870,128 @@ add_riverspider_to_profile() {
     sed -i'' -e "s#${pattern_to_find}.*#${line_to_set}#" "$shell_profile" ||
       echo "Could not add RIVER_SPIDER_DIR to $shell_profile. Add manually: $line_to_set"
   else
-    { echo ""; echo "$line_to_set"; } >> "$shell_profile" ||
+    { echo ""; echo "$line_to_set"; echo "";} >> "$shell_profile" ||
       echo "Could not add RIVER_SPIDER_DIR to $shell_profile. Add manually: $line_to_set"
   fi
 }
 #=============================================
+
+#=======  Logisim helper function =======
+
+logisim() {
+  if [[ "$#" -eq 0 ]]; then
+    java -jar "$RIVER_SPIDER_DIR/logisim310.jar"
+    return $?
+  fi
+
+  local arg1="$1"
+
+  if [[ "$arg1" == "-h" || "$arg1" == "--help" ]]; then
+    echo "Usage: logisim [<filename.circ>]"
+    echo "       logisim -h | --help     Show this help message"
+    echo ""
+    return 1
+  fi
+
+  if [[ "${arg1##*.}" != "circ" ]]; then
+    echo "Error: File '$arg1' must have a .circ extension." >&2
+    return 1
+  fi
+
+  if [[ ! -f "$arg1" ]]; then
+    echo "Error: File '$arg1' not found." >&2
+    return 1
+  fi
+
+  java -jar "$RIVER_SPIDER_DIR/logisim310.jar" "$arg1"
+  
+  return $? 
+}
+
+logproc(){
+  java -jar "$RIVER_SPIDER_DIR/logisim310.jar" "$RIVER_SPIDER_DIR/processor0004.circ"
+}
+
+logalu(){
+  java -jar "$RIVER_SPIDER_DIR/logisim310.jar" "$RIVER_SPIDER_DIR/alu.circ"
+}
+
+logreg(){
+  java -jar "$RIVER_SPIDER_DIR/logisim310.jar" "$RIVER_SPIDER_DIR/regbank.circ"
+}
+
+#========================================
 EOF
 
-    echo "" >>  "$SHELL_PROFILE_FILE"
-    sed -i '' -e "s#zsh) shell_profile=.*#zsh) shell_profile=\"\${ZDOTDIR:-\$HOME}/${ZSH_CONF_FILE}\" ;;#" "$SHELL_PROFILE_FILE"
-    sed -i '' -e "s#bash) shell_profile=.*#bash) shell_profile=\"\$HOME/${BASH_CONF_FILE}\" ;;#" "$SHELL_PROFILE_FILE"
-    if grep -q "riverspider()" "$SHELL_PROFILE_FILE"; then
-      log_success "Added 'riverspider' helper function to shell profile"
-      log_debug "Confirmed 'riverspider' helper function exists in $SHELL_PROFILE_FILE."
+    echo "" >>"$SHELL_PROFILE_FILE"
+    sed -i '' -e "s#zsh) shell_profile=.*#zsh) shell_profile=\"\${ZDOTDIR:-\$HOME}/${ZSH_PROFILE_BASENAME}\" ;;#" "$SHELL_PROFILE_FILE"
+    sed -i '' -e "s#bash) shell_profile=.*#bash) shell_profile=\"\$HOME/${BASH_PROFILE_BASENAME}\" ;;#" "$SHELL_PROFILE_FILE"
+    if grep -q "${helper_function_name}()" "$SHELL_PROFILE_FILE"; then
+      log_success "Added '$helper_function_name' helper function to shell profile"
+      log_debug "Confirmed '$helper_function_name' helper function exists in $SHELL_PROFILE_FILE."
     else
-      log_warning "Failed to add 'riverspider' helper function. Please add the following manually to your shell profile file:"
-      echo ""
-      echo "$HELPER_FUNCTION"
-      echo ""
+      log_warning "Failed to add '$helper_function_name' helper function."
     fi
   fi
 }
 
-# This part of the setup cannot be automated by the script.
-display_riverspider_setup_instructions() {
-  echo ""
-  log_warning "Manual setup of River Spider required:"
+# ========================================================================
 
+display_startup_message() {
+  ensure_file_writable "$LOG_FILE" "LOG file"
+  echo "───────────────────────────────────────────────" >"$LOG_FILE"
+  echo "Setup started at $(date)" >>"$LOG_FILE"
+  echo "───────────────────────────────────────────────" >>"$LOG_FILE"
+  echo "================================================="
+  log_info "Starting riverSpider setup script"
+  log_info "Setup started at: $(date)"
+  log_info "Setup logfile:    $LOG_FILE"
+  echo "================================================="
+  echo
+  echo
+}
+
+display_completion_message() {
+  printf "\n"
+  log_info "================================================="
+  log_info "         riverSpider Setup Complete"
+  log_info "================================================="
+  printf "\n"
+  log_info "${tty_bold}---All automated setup steps finished.---${tty_reset}"
+  log_info "Please look back at any ${tty_yellow}'Warning:'${tty_reset} messages just in case."
+  printf "\n"
+  log_info "${tty_bold}--- IMPORTANT NEXT STEPS ---${tty_reset}"
+  log_info "1. ${tty_yellow}Restart your Terminal:${tty_reset}"
+  log_info "   (Alternatively, for your ${tty_bold}current terminal window only)${tty_reset}, you could run:"
+  log_info "      ${tty_green}source${tty_reset} $SHELL_PROFILE_FILE"
+  printf "\n"
+  log_info "2. ${tty_yellow}Complete Manual Google App Script Setup:${tty_reset}"
+  log_info "   If you haven't done it yet, follow the Google App Script setup instructions"
+  log_info "   and make sure to save the Web App URL in:"
+  log_info "      ${tty_green}${RIVER_SPIDER_DIR}/${WEBAPP_URL_FILE_NAME}${tty_reset}"
+  printf "\n"
+  log_info "After restarting your terminal and doing the Google App Script setup,"
+  log_info "you can use the new command like this:"
+  log_info "      ${tty_green}riverspider${tty_reset} ${tty_yellow}<your_file.ttpasm>${tty_reset}"
+  log_info "(You can run this from any folder)."
+  printf "\n"
+  log_info "───────────────────────────────────────────────"
+  log_info "   Details about everything the script did were saved to:"
+  log_info "      ${tty_green}$LOG_FILE${tty_reset}"
+  log_info "───────────────────────────────────────────────"
+  log_info "Script finished execution successfully at $(date +%Y-%m-%d_%H:%M:%S)"
+  log_info "================================================="
+}
+
+# This part of the setup cannot be automated by the script.
+display_google_apps_script_setup_instructions() {
+  echo ""
+  log_info "Manual setup of Google App Script:"
   echo ""
   echo "👉 Make a copy of:"
   echo ""
-  echo "   shared/processor/$GOOGLE_SHEETS_NAME"
-  echo "   $GOOGLE_DRIVE_URL"
+  echo "   shared/processor/${GOOGLE_SHEETS_DOC_NAME}"
+  echo "   ${GOOGLE_DRIVE_FOLDER_URL}"
   echo ""
   echo "   File > Make a Copy"
   echo "   Save it to: My Drive"
@@ -681,69 +1012,104 @@ display_riverspider_setup_instructions() {
   echo ""
   echo "🔗 Copy the 'Web App URL'"
   echo ""
-  echo "📥 Paste it into:"
-  echo "   $RIVER_SPIDER_DIR/webapp.url"
-  echo ""
-  echo "📦 To verify River Spider setup:"
-  echo "   cd $RIVER_SPIDER_DIR"
-  echo "   ./submit.sh test.ttpasm"
-  echo ""
 }
 
-display_completion_message() {
-  echo ""
-  log_info "Setup complete!"
-  log_info "───────────────────────────────────────────────"
-  log_info "Please restart your terminal"
-  log_info "or run: source ${SHELL_PROFILE_FILE}"
-  log_info "to apply all changes."
-  log_info "───────────────────────────────────────────────"
-  log_info "Log file: ${LOG_FILE}"
-  echo ""
-  
-  log_debug "Script completed successfully at $(date)"
+setup_google_webapp_url() {
+  local answer=""
+  local web_app_url=""
+  local prompt="❓ Would you like to view Google Apps Script setup instructions? [Y/n]: "
+
+  while true; do
+    printf "\n"
+    read -rp "$prompt" answer
+    case "$answer" in
+    "" | [Yy]*)
+      display_google_apps_script_setup_instructions
+
+      while true; do
+        read -rp "📥 Paste the Web App URL (or 'q' to cancel): " web_app_url
+        if [[ "$web_app_url" =~ ^[Qq]$ ]]; then
+          echo ""
+          echo "❌ URL entry cancelled by user."
+          echo ""
+          exit 1
+        fi
+
+        # Strip surrounding quotes if present
+        web_app_url="${web_app_url%\"}"
+        web_app_url="${web_app_url#\"}"
+        if [[ "$web_app_url" =~ ^https://script\.google\.com/macros/s/.+/exec$ ]]; then
+          ensure_file_writable "$RIVER_SPIDER_DIR/$WEBAPP_URL_FILE_NAME" "Web App url"
+          echo "$web_app_url" >"$RIVER_SPIDER_DIR/$WEBAPP_URL_FILE_NAME"
+          echo ""
+          echo "📝 Web App URL saved to: ${RIVER_SPIDER_DIR}/${WEBAPP_URL_FILE_NAME}"
+          echo ""
+          break
+        else
+          log_warning "⛓️‍💥 Invalid URL."
+          echo "It must match: https://script.google.com/macros/s/{ID}/exec"
+          echo ""
+        fi
+      done
+      break
+      ;;
+    [Nn]*)
+      echo ""
+      echo "⏭️  Setup instructions skipped."
+      echo ""
+      break
+      ;;
+    *)
+      echo ""
+      log_warning "⁉️ Please answer [Y]es or [N]o."
+      ;;
+    esac
+  done
 }
 
 main() {
+  # Set up the colors for messages.
   setup_terminal_colors
+  # Create/clear the log file and show starting messages on screen.
+  display_startup_message
 
-  echo "Setup started at $(date)" > "$LOG_FILE"
-  log_info "Starting riverSpider setup script"
-  log_info "Setup started at: $(date)"
-  log_info "Setup logfile:    $LOG_FILE"
+  log_info "=== PHASE 1: System Validation ==="
+  echo "───────────────────────────────────────────────"
+  check_required_system_commands          # Are basic tools present?
+  check_operating_system_and_architecture # Is it macOS? Intel/Apple Silicon?
+  check_internet_connectivity             # Can it reach the internet?
+  determine_shell_and_profile             # Which shell? Where's the profile file?
+  echo "───────────────────────────────────────────────"
+  log_success "System validation complete."
+  echo
+  echo
+  log_info "=== PHASE 2: Dependency Installation ==="
+  echo "───────────────────────────────────────────────"
+  setup_homebrew_environment # Install/configure/update Homebrew.
+  install_required_packages  # Install mise, fd, etc.
+  verify_installed_tools     # Check installed tools are working.
+  configure_mise_environment # Set up mise in the shell.
+  install_java_with_mise     # Install OpenJDK using mise.
+  echo "───────────────────────────────────────────────"
+  log_success "Dependency installation complete."
+  echo
+  echo
+  log_info "=== PHASE 3: 'riverSpider' Setup ==="
+  echo "───────────────────────────────────────────────"
+  find_river_spider_directory               # Find or download the riverSpider folder.
+  set_river_spider_dir_variable             # Always remember where the riverSpider folder is.
+  update_paths_in_riverspider_submit_script # Fix paths inside submit.sh (so it can be called from anywhere)
+  add_river_spider_shell_helper_function    # Add the 'riverspider' command.
+  echo "───────────────────────────────────────────────"
+  log_success "'riverSpider' configuration complete."
+  echo
 
-
-  # === Pre-flight Checks ===
-  # Run checks before attempting any installations.
-  check_macos     # Check if on macOS.
-  check_internet  # Check for internet connection.
-  detect_shell    # Find shell and profile file.
-  # Check if basic commands like 'curl', 'git' etc. are installed.
-  check_required_commands "${REQUIRED_COMMANDS[@]}"
-
-  # === riverSpider Directory Setup ===
-  locate_river_spider_dir    # Find the downloaded riverSpider folder.
-  update_riverspider_paths   # Fix paths inside submit.sh (so it can be called from anywhere)
-
-  # === Software Installation ===
-  setup_homebrew # install or find Homebrew binaries
-  
-  install_packages "${PACKAGES_TO_INSTALL[@]}" # Install tools via Homebrew.
-  verify_tools "${TOOLS_TO_VERIFY[@]}"         # make sure tools are usuable
-  
-  configure_mise                               # Set up the 'mise' tool.
-  install_java                                 # Install Java using 'mise'.
-
-  # === Final Configuration ===
-  
-  add_river_spider_helper                      # Add the 'riverspider' command to profile.
-  
-  display_riverspider_setup_instructions       # Show Google Sheets steps.
-  
+  # Show the final "all done" message.
   display_completion_message
-  
+  # Show Google Sheets steps, and/or add Web App URL to webapp.url file
+  setup_google_webapp_url
   return 0
 }
 
 main "$@"
-exit 0
+exit $?
