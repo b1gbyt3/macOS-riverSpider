@@ -765,22 +765,20 @@ update_path_in_submit_script() {
     log_success " - ${path_description} path appears to be already correctly set in ${SUBMIT_SCRIPT_NAME}."
     return 0
   fi
-  if grep -Fxq -- "${old_line_pattern}" "${submit_script_path}"; then
-    log_debug "Found the expected original line for '${path_description}'. Replacing it."
-    if sed -i '' -e "s#${old_line_pattern}#${new_line_content}#" "$submit_script_path"; then
-      if ! grep -Fxq -- "$new_line_content" "$submit_script_path"; then
-        log_warning " - Couldn't update path for '${path_description}' in ${SUBMIT_SCRIPT_NAME}."
-        return 1
-      fi
-      log_success " - Updated path for '${path_description}' in ${SUBMIT_SCRIPT_NAME}."
-    else
-      log_warning " - Couldn't update path for '${path_description}' in ${SUBMIT_SCRIPT_NAME}."
-      return 1
-    fi
-  else
+  if ! grep -Fxq -- "${old_line_pattern}" "${submit_script_path}"; then
     log_warning " - Could not find '${path_description}' in '${SUBMIT_SCRIPT_NAME}'"
     return 1
   fi
+  log_debug "Found the expected original line for '${path_description}'. Replacing it."
+  if ! sed -i '' -e "s#${old_line_pattern}#${new_line_content}#" "$submit_script_path"; then
+    log_warning " - Couldn't update path for '${path_description}' in ${SUBMIT_SCRIPT_NAME}."
+    return 1
+  fi
+  if ! grep -Fxq -- "$new_line_content" "$submit_script_path"; then
+    log_warning " - Couldn't update path for '${path_description}' in ${SUBMIT_SCRIPT_NAME}."
+    return 1
+  fi
+  log_success " - Updated path for '${path_description}' in ${SUBMIT_SCRIPT_NAME}."
 }
 
 # Changes relative paths (like 'secretString.txt') inside the submit.sh script
