@@ -86,7 +86,7 @@ readonly TEST_FILE_NAME="test.ttpasm"
 
 # --- Log File ---
 # Creates a new log file with the date and time in its name each time the script runs.
-readonly LOG_FILE="/tmp/riverspider_setup_$(date +%Y%m%d_%H%M%S).log"
+readonly LOG_FILE="$(mktemp "/tmp/riverspider_setup_$(date +%Y%m%d_%H%M%S).log")"
 
 # --- Homebrew Install Url ---
 readonly HOMEBREW_INSTALL_URL="https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh"
