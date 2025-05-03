@@ -95,8 +95,8 @@ jobs:
               echo "ERROR: 'riverspider' command exited with code $riverspider_exit_code."
               exit $riverspider_exit_code
           fi
-          if [ ! -f "$RIVER_SPIDER_DIR/test.csv" ] && \
-             [ ! -f "$RIVER_SPIDER_DIR/test.log" ] && \
+          if [ ! -f "$RIVER_SPIDER_DIR/test.csv" ] || \
+             [ ! -f "$RIVER_SPIDER_DIR/test.log" ] || \
              [ ! -f "$RIVER_SPIDER_DIR/test.tsv" ]; then
               echo "ERROR: One or more expected output files (test.csv, test.log, test.tsv) were NOT created in ${RIVER_SPIDER_DIR}."
               exit 1
