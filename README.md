@@ -27,7 +27,7 @@
       > Note: `[your_file.circ]` is optional
   * `logproc` - opens `processor0004.circ` in Logisim **(from anywhere)**
   * `logalu` - opens `alu.circ` in Logisim **(from anywhere)**
-  * `logreg` - opens `regBank.circ` in Logisim **(from anywhere)**
+  * `logreg` - opens `regbank.circ` in Logisim **(from anywhere)**
 
 ## After Install (Required)
 * Source config:
