@@ -3,7 +3,7 @@
 # riverSpider macOS Setup Script
 #
 # Author: Ilya Babenko
-# Last updated: 2025-05-02
+# Last updated: 2025-05-03
 # Version: 2.1.0
 #
 # What this script does:
