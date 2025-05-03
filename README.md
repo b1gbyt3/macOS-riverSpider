@@ -13,7 +13,21 @@
 ```
 
 * Installs: [Homebrew](https://brew.sh), [mise](https://github.com/jdx/mise?tab=readme-ov-file#what-is-it), [fd](https://github.com/sharkdp/fd?tab=readme-ov-file#fd), [wget](https://www.gnu.org/software/wget/), [coreutils](https://www.gnu.org/software/coreutils/), [OpenJDK](https://openjdk.org)
-* Adds: `riverspider` shell function to your config file
+* Adds: easy to use shell function to your config file:
+  * `riverspider` - runs `riverSpider/submit.sh` on passed file **(from anywhere)**
+    * ## Usage
+      ```bash
+      riverspider <your_file.ttpasm>
+      ```
+  * `logisim` - opens Logisim (from anywhere)
+    * ## Usage
+      ```bash
+      logisim [your_file.circ]
+      ```
+      > Note: `[your_file.circ]` is optional
+  * `logproc` - opens `processor0004.circ` in Logisim **(from anywhere)**
+  * `logalu` - opens `alu.circ` in Logisim **(from anywhere)**
+  * `logreg` - opens `regBank.circ` in Logisim **(from anywhere)**
 
 ## After Install (Required)
 * Source config:
@@ -21,10 +35,7 @@
   * `source ~/.bash_profile` (Bash)
 * Or restart terminal
 
-## Usage
-```bash
-riverspider <your_file.ttpasm>
-```
+
 
 
 ## LIMITATIONS
