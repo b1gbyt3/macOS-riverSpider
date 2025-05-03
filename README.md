@@ -1,4 +1,9 @@
 # riverSpider macOS Setup Script
+
+
+[![Test riverSpider setup script on macOS](https://github.com/b1gbyt3/macOS-riverSpider/actions/workflows/test-macos-install.yml/badge.svg)](https://github.com/b1gbyt3/macOS-riverSpider/actions/workflows/test-macos-install.yml)
+
+
 **Full Install Time Estimate:** <5 mins
 
 Includes:
