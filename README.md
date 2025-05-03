@@ -1,4 +1,14 @@
 # riverSpider macOS Setup Script
+**Full Install Time Estimate:** <5 mins
+
+Includes:
+* Downloading and installing `Homebrew`
+* Installing necessary packages (`coreutils`, `mise`, `wget`, `fd`)
+* Setting up latest `Java OpenJDK`
+* Downloading and unzipping `riverSpiderForMac.zip`
+
+*Note: Actual time may vary based on your hardware and internet speed. (Tested on M1 Max 10-core, 64GB RAM, 250Mbps connection).*
+
 
 ## Before Install (Required)
 
@@ -8,6 +18,7 @@
 2.  Click **+**, navigate to `Applications/Utilities/`, select **Terminal.app**, and click **Open**.
 3.  Ensure the switch next to Terminal is **ON**.
 ## Install
+
 ```bash
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/b1gbyt3/macOS-riverSpider/HEAD/install.sh)"
 ```
