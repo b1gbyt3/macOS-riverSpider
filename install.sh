@@ -433,9 +433,10 @@ install_homebrew_if_missing() {
   # Show the spinning progress animation while it installs.
   progress_indicator "Installing Homebrew" "$installer_pid" "critical"
   log_info "Verifying Homebrew installation..."
-  if [[ -x "$HOMEBREW_PATH" ]]; then
-    log_success "Homebrew successfully installed at '$HOMEBREW_PATH'."
+  if [[ ! -x "$HOMEBREW_PATH" ]]; then
+    log_error "Failed to install Homebrew. Ensure you have sudo privileges and try again."
   fi
+  log_success "Homebrew successfully installed at '$HOMEBREW_PATH'."
 }
 
 configure_homebrew_shell_environment() {
@@ -571,7 +572,7 @@ configure_mise_environment() {
   # Activate 'mise' for the current script session so we can use it to install Java.
   log_debug "Activating mise for the current script session..."
   # Run the activation command using 'eval'. Check if it succeeds.
-  if $mise_executable activate >/dev/null; then
+  if $mise_executable activate >>"$LOG_FILE" 2>&1; then
     log_success "mise environment configured and active for this session."
   else
     log_error "Failed to activate mise environment."
