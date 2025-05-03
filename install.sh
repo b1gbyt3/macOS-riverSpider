@@ -923,9 +923,9 @@ logreg(){
 EOF
 
     echo "" >>"$SHELL_PROFILE_FILE"
-    sed -i '' -e "s#zsh) shell_profile=.*#zsh) shell_profile=\"\${ZDOTDIR:-\$HOME}/${ZSH_PROFILE_BASENAME}\" ;;#" "$SHELL_PROFILE_FILE"  ||
+    sed -i '' -e "s#zsh) shell_profile=.*#zsh) shell_profile=\"\${ZDOTDIR:-\$HOME}/${ZSH_PROFILE_BASENAME}\" ;;#" "$SHELL_PROFILE_FILE" ||
       log_warning "Could not update shell_profile for ZSH in $SHELL_PROFILE_FILE. Add manually: $ZSH_PROFILE_BASENAME"
-    sed -i '' -e "s#bash) shell_profile=.*#bash) shell_profile=\"\$HOME/${BASH_PROFILE_BASENAME}\" ;;#" "$SHELL_PROFILE_FILE"   ||
+    sed -i '' -e "s#bash) shell_profile=.*#bash) shell_profile=\"\$HOME/${BASH_PROFILE_BASENAME}\" ;;#" "$SHELL_PROFILE_FILE" ||
       log_warning "Could not update shell_profile for BASH in $SHELL_PROFILE_FILE. Add manually: $BASH_PROFILE_BASENAME"
     if grep -q "${helper_function_name}()" "$SHELL_PROFILE_FILE"; then
       log_success "Added '$helper_function_name' helper function to shell profile"
