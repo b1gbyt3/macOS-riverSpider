@@ -57,7 +57,7 @@ readonly TTPASM_APP_SCRIPT_DEFAULT_PASSWD="1234!@#\$qwerQWER"
 readonly RIVER_SPIDER_GOOGLE_DRIVE_FILE_ID="1g63nlTRa-Ibgj0ZUf3HX1fbdSrW90JBs"
 readonly RIVER_SPIDER_ZIP_NAME="riverSpiderForMac.zip"
 readonly RIVER_SPIDER_OUTPUT_FILE="${HOME}/${RIVER_SPIDER_ZIP_NAME}"
-readonly RIVER_SPIDER_EXTRACT_DIRECTORY="${HOME}/temp_riverSpider_extraction"
+readonly RIVER_SPIDER_EXTRACT_DIRECTORY="$(mktemp -d)"
 readonly RIVER_SPIDER_TARGET_DIRECTORY="${HOME}/riverSpider"
 
 # --- Relative Paths in submit.sh ---
@@ -97,7 +97,7 @@ readonly INTEL_HOMEBREW_PATH="/usr/local/bin/brew"  # Usual place on Intel Macs
 
 # --- Needed Commands & Tools ---
 # Basic commands the script expects to find on the Mac.
-readonly REQUIRED_SYSTEM_COMMANDS=("mkdir" "mktemp" "rm" "dirname" "basename" "realpath" "touch" "cat" "echo" "printf" "head" "ping" "curl" "unzip" "git" "uname" "sw_vers" "grep" "sed" "tr" "sleep")
+readonly REQUIRED_SYSTEM_COMMANDS=("mkdir" "rm" "dirname" "basename" "realpath" "touch" "cat" "echo" "printf" "head" "ping" "curl" "unzip" "git" "uname" "sw_vers" "grep" "sed" "tr" "sleep")
 # Java that WORKS with logisim
 readonly JDK_MISE_NAME="java@openjdk"
 readonly HOMEBREW_PACKAGES_TO_INSTALL=("coreutils" "wget" "mise" "fd")
@@ -816,7 +816,7 @@ add_river_spider_shell_helper_function() {
   log_info "Setting up River Spider helper function..."
   local helper_function_name="riverspider"
 
-  if grep -q "${helper_function_name}()" "$SHELL_PROFILE_FILE"; then
+  if grep -q "^${helper_function_name}()" "$SHELL_PROFILE_FILE"; then
     log_success "'$helper_function_name' helper function already in shell profile"
   else
     log_info "Adding River Spider helper function..."
