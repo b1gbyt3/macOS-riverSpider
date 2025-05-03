@@ -4,7 +4,7 @@
 #
 # Author: Ilya Babenko
 # Last updated: 2025-05-02
-# Version: 2.0.1
+# Version: 2.1.0
 #
 # What this script does:
 # This script helps set up the riverSpider on your Mac automatically.
