@@ -1012,6 +1012,7 @@ display_google_apps_script_setup_instructions() {
   echo ""
   echo "🔗 Copy the 'Web App URL'"
   echo ""
+  open "${GOOGLE_DRIVE_FOLDER_URL}"
 }
 
 setup_google_webapp_url() {
