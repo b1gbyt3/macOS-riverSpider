@@ -1,27 +1,7 @@
 # riverSpider macOS Setup Script
 
-# [INSTALL WALKTHROUGH](https://youtu.be/wYY27ob8vMY)
-
 ## Before Install (Required)
-**Download riverSpider and setup Google Sheets Web App:**
-* Download and Unzip `riverSpider` (SEE CANVAS)
-* Setup [Google Sheet - Student Assembler](https://drive.google.com/drive/folders/0BxsMACqxAFNwR1pCb2pPeE5Wb1E?resourcekey=0-fb_u058vHLwLSyiSaBKPoQ):
-   * Make a copy of **'Copy of assemblerStudent'**
-     * File > Make a Copy
-     * Save it to: My Drive
-     * Click: 'Make a Copy' 
-   * Deploy App Script (in your copy)
-     * Extensions > Apps Script
-     * Deploy > New Deployment
-       ```
-       Description:    River Spider Script
-       Execute as:     Me
-       Access:         Anyone
-       ```
-     * Click: 'Deploy'
-     * Authorize and Allow Access
-   * Put Web App URL into `riverSpider/webapp.url`
-     
+
 **Grant Full Disk Access to Terminal:**
 
 1.  Go to **System Settings > Privacy & Security > Full Disk Access**.
