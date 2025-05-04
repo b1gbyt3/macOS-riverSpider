@@ -4,7 +4,7 @@
 #
 # Author: Ilya Babenko
 # Last updated: 2025-05-03
-# Version: 2.3.2
+# Version: 2.3.3
 #
 # What this script does:
 # This script helps set up the riverSpider on your Mac automatically.
@@ -50,7 +50,7 @@ readonly BASH_PROFILE_BASENAME=".bash_profile" # For Bash shell
 
 # --- Google Drive Info  ---
 # Link and name used in the manual setup instructions for Google Sheets.
-readonly GOOGLE_DRIVE_FOLDER_URL="https://drive.google.com/drive/folders/0BxsMACqxAFNwR1pCb2pPeE5Wb1E?resourcekey=0-fb_u058vHLwLSyiSaBKPoQ"
+readonly GOOGLE_SHEETS_DOC_URL="https://docs.google.com/spreadsheets/d/18Ln5Sivnq3Kwe9QaxTbgoJzahjdz34FqQDD_QwiiVOU/edit?gid=384184973#gid=384184973"
 readonly GOOGLE_SHEETS_DOC_NAME="'Copy of assemblerStudent'" # The name of the sheet template
 readonly TTPASM_APP_SCRIPT_DEFAULT_PASSWD="1234!@#\$qwerQWER"
 # --- Download riverSpider from Google Drive ---
@@ -1007,7 +1007,6 @@ display_google_apps_script_setup_instructions() {
   echo "👉 Make a copy of:"
   echo ""
   echo "   shared/processor/${GOOGLE_SHEETS_DOC_NAME}"
-  echo "   ${GOOGLE_DRIVE_FOLDER_URL}"
   echo ""
   echo "   File > Make a Copy"
   echo "   Save it to: My Drive"
@@ -1028,7 +1027,7 @@ display_google_apps_script_setup_instructions() {
   echo ""
   echo "🔗 Copy the 'Web App URL'"
   echo ""
-  open "${GOOGLE_DRIVE_FOLDER_URL}"
+  open "${GOOGLE_SHEETS_DOC_URL}"
 }
 
 setup_google_webapp_url() {
