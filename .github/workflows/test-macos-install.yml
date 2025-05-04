@@ -5,11 +5,13 @@ on:
     branches: [ main ]
     paths: 
       - 'install.sh'
+      - '.github/workflows/test-macos-install.yml'
   
   pull_request: 
     branches: [ main ]
     paths: 
       - 'install.sh'
+      - '.github/workflows/test-macos-install.yml'
   
   workflow_dispatch:
 
