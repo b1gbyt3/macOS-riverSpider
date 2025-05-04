@@ -4,7 +4,7 @@
 #
 # Author: Ilya Babenko
 # Last updated: 2025-05-03
-# Version: 2.3.3
+# Version: 2.3.4
 #
 # What this script does:
 # This script helps set up the riverSpider on your Mac automatically.
@@ -249,7 +249,7 @@ log_warning() {
 
 # Shows error messages and stops the script.
 log_error() {
-  local abort_timestamp="$(date)"
+  local abort_timestamp="$(date +%Y%m%d_%H%M%S)"
   local msg="$*"
   ensure_file_writable "$LOG_FILE" "LOG file"
   printf "${tty_red}Error${tty_reset}: %s\n" "$msg" >&2
