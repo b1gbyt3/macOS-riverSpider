@@ -647,6 +647,18 @@ install_java_with_mise() {
 
 # ========================== riverSpider SETUP ===========================
 
+ensure_secrets_initialized() {
+  if [[ -z "${RIVER_SPIDER_DIR}" || -z "${SECRET_FILE_NAME}" || -z "${TTPASM_APP_SCRIPT_DEFAULT_PASSWD}" ]]; then
+    log_error "One or more required global variables (RIVER_SPIDER_DIR, SECRET_FILE_NAME, TTPASM_APP_SCRIPT_DEFAULT_PASSWD) are not set."
+  fi
+  local file_path="${RIVER_SPIDER_DIR}/${SECRET_FILE_NAME}"
+  ensure_file_writable "${file_path}" "${SECRET_FILE_NAME}"
+  local file_content=$(<"${file_path}")
+  if [[ -z $file_content ]]; then
+    echo "$TTPASM_APP_SCRIPT_DEFAULT_PASSWD" >"$file_path"
+  fi
+}
+
 clean_up_riverspider_download() {
   if [ -d "${RIVER_SPIDER_EXTRACT_DIRECTORY}/riverSpider" ]; then
     log_debug "Moving contents to $RIVER_SPIDER_TARGET_DIRECTORY..."
@@ -742,8 +754,7 @@ find_river_spider_directory() {
     log_success "Found 'riverSpider' at $potential_dir"
     RIVER_SPIDER_DIR="$potential_dir"
   fi
-  ensure_file_writable "${RIVER_SPIDER_DIR}/${SECRET_FILE_NAME}" "${SECRET_FILE_NAME}"
-  echo "$TTPASM_APP_SCRIPT_DEFAULT_PASSWD" >"${RIVER_SPIDER_DIR}/${SECRET_FILE_NAME}"
+  ensure_secrets_initialized
 }
 
 update_path_in_submit_script() {
