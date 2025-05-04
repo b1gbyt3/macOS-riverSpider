@@ -4,7 +4,7 @@
 #
 # Author: Ilya Babenko
 # Last updated: 2025-05-03
-# Version: 2.3.1
+# Version: 2.3.2
 #
 # What this script does:
 # This script helps set up the riverSpider on your Mac automatically.
@@ -84,9 +84,11 @@ readonly TEST_FILE_NAME="test.ttpasm"
 
 # ========================== DO NOT CHANGE ==========================
 
+readonly START_TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
+
 # --- Log File ---
 # Creates a new log file with the date and time in its name each time the script runs.
-readonly LOG_FILE="$(mktemp "/tmp/riverspider_setup_$(date +%Y%m%d_%H%M%S).log")"
+readonly LOG_FILE="$(mktemp "/tmp/riverspider_setup_${START_TIMESTAMP}.log")"
 
 # --- Homebrew Install Url ---
 readonly HOMEBREW_INSTALL_URL="https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh"
@@ -247,12 +249,13 @@ log_warning() {
 
 # Shows error messages and stops the script.
 log_error() {
+  local abort_timestamp="$(date)"
   local msg="$*"
   ensure_file_writable "$LOG_FILE" "LOG file"
   printf "${tty_red}Error${tty_reset}: %s\n" "$msg" >&2
   echo "[ERROR] $msg" >>"$LOG_FILE"
-  echo "[ERROR] Script aborted at $(date)" >>"$LOG_FILE"
-  echo "[ERROR] Script aborted at $(date) check logfile $LOG_FILE"
+  echo "[ERROR] Script aborted at ${abort_timestamp}" >>"$LOG_FILE"
+  echo "[ERROR] Script aborted at ${abort_timestamp} check logfile $LOG_FILE"
   exit 1
 }
 
@@ -952,11 +955,11 @@ EOF
 display_startup_message() {
   ensure_file_writable "$LOG_FILE" "LOG file"
   echo "───────────────────────────────────────────────" >"$LOG_FILE"
-  echo "Setup started at $(date)" >>"$LOG_FILE"
+  echo "Setup started at ${START_TIMESTAMP}" >>"$LOG_FILE"
   echo "───────────────────────────────────────────────" >>"$LOG_FILE"
   echo "================================================="
   log_info "Starting riverSpider setup script"
-  log_info "Setup started at: $(date)"
+  log_info "Setup started at: ${START_TIMESTAMP}"
   log_info "Setup logfile:    $LOG_FILE"
   echo "================================================="
   echo
@@ -964,6 +967,7 @@ display_startup_message() {
 }
 
 display_completion_message() {
+  local end_timestamp="$(date +%Y-%m-%d_%H:%M:%S)"
   printf "\n"
   log_info "================================================="
   log_info "         riverSpider Setup Complete"
@@ -991,7 +995,7 @@ display_completion_message() {
   log_info "   Details about everything the script did were saved to:"
   log_info "      ${tty_green}$LOG_FILE${tty_reset}"
   log_info "───────────────────────────────────────────────"
-  log_info "Script finished execution successfully at $(date +%Y-%m-%d_%H:%M:%S)"
+  log_info "Script finished execution successfully at ${end_timestamp}"
   log_info "================================================="
 }
 
