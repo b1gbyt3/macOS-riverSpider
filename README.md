@@ -66,8 +66,11 @@ Includes:
   ```
   * Edit in `install.sh`:
   ```bash
-  ZSH_CONF_FILE=".zprofile"  # Change if using .zshrc
-  BASH_CONF_FILE=".bash_profile"  # Change if using .bashrc
+# --- Shell Settings Filenames ---
+# Default names for the shell configuration files.
+# You might need to change these if you use different filenames like '.zshrc' or '.bashrc'.
+readonly ZSH_PROFILE_BASENAME=".zprofile"      # For Zsh shell
+readonly BASH_PROFILE_BASENAME=".bash_profile" # For Bash shell
   ```
   * Run: `chmod +x install.sh && ./install.sh`
 
