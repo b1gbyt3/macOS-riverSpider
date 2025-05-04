@@ -22,6 +22,7 @@ Includes:
 1.  Go to **System Settings > Privacy & Security > Full Disk Access**.
 2.  Click **+**, navigate to `Applications/Utilities/`, select **Terminal.app**, and click **Open**.
 3.  Ensure the switch next to Terminal is **ON**.
+
 ## Install
 
 ```bash
@@ -49,13 +50,52 @@ Includes:
 * Source config:
   * `source ~/.zprofile` (Zsh)
   * `source ~/.bash_profile` (Bash)
-* Or restart terminal
+  > Or restart terminal
+
+* Make a Copy of: 'Copy of assemblerStudent'
+  * Deploy Google App Script
+  * Paste the Web App Url into `riverSpider/webapp.url`
+
+* **Optional:**
+  * Change default secret string:
+  ```javascript
+  function genDigest()
+  {
+    let mySecretString = '...' # CHANGE ME
+    console.log(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_512, mySecretString, Utilities.Charset.UTF_8))
+  }
+  ```
+  > If you change this secret string, make sure to PASTE the same secret string in `riverSpider/secretString.txt` - **THEY HAVE TO MATCH**
+
 
 
 
 
 ## LIMITATIONS
-### Shell Config Files
+### ‼️ Google Drive Dependencies
+If any Google Drive resources are modified, update these variables or the script will break:
+
+```bash
+# --- Google Drive Info  ---
+readonly GOOGLE_SHEETS_DOC_URL="..."                           # Complete URL to the 'Copy of assemblerStudent' in Google Sheets
+readonly GOOGLE_SHEETS_DOC_NAME="'Copy of assemblerStudent'"   # Exact name of the Google Sheet
+readonly TTPASM_APP_SCRIPT_DEFAULT_PASSWD="..."                # Default password for Google App Script (TTPASMbr)
+
+# --- Download riverSpider from Google Drive ---
+readonly RIVER_SPIDER_GOOGLE_DRIVE_FILE_ID="..."               # Google Drive file ID for riverSpiderForMac.zip
+readonly RIVER_SPIDER_ZIP_NAME="riverSpiderForMac.zip"         # Exact name of the riverSpider zip file for macOS
+```
+---
+
+### ⚠️ No Spaces in Paths!
+* ✅ GOOD: `~/CISP_310/riverSpider/`
+* ❌ BAD: `~/CISP 310/riverSpider/`
+* ✅ GOOD: `~/CISP310/riverSpider/my-file.ttpasm`
+* ❌ BAD: `~/CISP_310/riverSpider/my file.ttpasm`
+> NO this `~/"CISP 310"/riverSpider/` and `~/CISP\ 310/riverSpider/` **DOESN'T FIX IT**
+---
+
+### ❓ Shell Config Files
 > NOTE: CURRENTLY ONLY WORKS ON [bash](https://en.wikipedia.org/wiki/Bash_(Unix_shell)) AND [zsh](https://en.wikipedia.org/wiki/Z_shell)
 * Defaults:
   *  `~/.zprofile` (Zsh)
@@ -74,9 +114,7 @@ Includes:
   ```
   * Run: `chmod +x install.sh && ./install.sh`
 
-### ⚠️ No Spaces in Paths!
-* ✅ GOOD: `~/CISP_310/riverSpider/`
-* ❌ BAD: `~/CISP 310/riverSpider/`
-* ✅ GOOD: `~/CISP310/riverSpider/my-file.ttpasm`
-* ❌ BAD: `~/CISP_310/riverSpider/my file.ttpasm`
-> NO this `~/"CISP 310"/riverSpider/` and `~/CISP\ 310/riverSpider/` **DOESN'T FIX IT**
+
+
+
+
