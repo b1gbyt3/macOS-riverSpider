@@ -109,6 +109,8 @@ readonly INSTALLED_TOOLS_TO_VERIFY=("timeout" "wget" "mise" "fd")
 # --- Internet Test Domains ---
 readonly CHECK_DOMAINS=("www.google.com" "www.apple.com" "github.com")
 
+declare FIND_ATTEMPT_COUNT=0 # How many times we've looked for the 'riverSpider' folder.
+readonly MAX_FIND_ATTEMPTS=2 # How many times to look for the 'riverSpider' folder.
 # ========================= END DO NOT CHANGE =======================
 
 # ===================================================================
@@ -227,31 +229,31 @@ setup_terminal_colors() {
 }
 
 log_info() {
-  local msg="$*"
   ensure_file_writable "$LOG_FILE" "LOG file"
+  local msg="$*"
   printf "${tty_blue}==>${tty_bold} %s${tty_reset}\n" "$msg"
   echo "[INFO] $msg" >>"$LOG_FILE"
 }
 
 log_success() {
-  local msg="$*"
   ensure_file_writable "$LOG_FILE" "LOG file"
+  local msg="$*"
   printf "${tty_green}✓${tty_reset} %s\n" "$msg"
   echo "[SUCCESS] $msg" >>"$LOG_FILE"
 }
 
 log_warning() {
-  local msg="$*"
   ensure_file_writable "$LOG_FILE" "LOG file"
+  local msg="$*"
   printf "${tty_yellow}Warning${tty_reset}: %s\n" "$msg" >&2
   echo "[WARNING] $msg" >>"$LOG_FILE"
 }
 
 # Shows error messages and stops the script.
 log_error() {
+  ensure_file_writable "$LOG_FILE" "LOG file"
   local abort_timestamp="$(date +%Y%m%d_%H%M%S)"
   local msg="$*"
-  ensure_file_writable "$LOG_FILE" "LOG file"
   printf "${tty_red}Error${tty_reset}: %s\n" "$msg" >&2
   echo "[ERROR] $msg" >>"$LOG_FILE"
   echo "[ERROR] Script aborted at ${abort_timestamp}" >>"$LOG_FILE"
@@ -261,10 +263,10 @@ log_error() {
 
 # Writes extra details (debug info) only to the log file.
 log_debug() {
+  ensure_file_writable "$LOG_FILE" "LOG file"
   if [[ "$VERBOSE" == "true" ]]; then
     echo "[DEBUG] $*"
   fi
-  ensure_file_writable "$LOG_FILE" "LOG file"
   echo "[DEBUG] $*" >>"$LOG_FILE"
 }
 # ========================================================================
@@ -419,6 +421,7 @@ progress_indicator() {
 # ===========================  HOMEBREW SETUP  ===========================
 
 install_homebrew_if_missing() {
+  ensure_file_writable "$LOG_FILE" "LOG file"
   log_info "Checking for Homebrew..."
   if [[ -x "$HOMEBREW_PATH" ]]; then
     log_success "Homebrew already installed"
@@ -465,6 +468,7 @@ configure_homebrew_shell_environment() {
 }
 
 update_and_configure_homebrew() {
+  ensure_file_writable "$LOG_FILE" "LOG file"
   log_info "Updating Homebrew and applying configurations..."
   if ! command_exists brew; then
     log_error "'brew' command not found. Cannot update Homebrew. Ensure previous setup steps succeeded."
@@ -494,6 +498,7 @@ setup_homebrew_environment() {
 # ========================== TOOL INSTALLATION ===========================
 
 install_homebrew_package_if_missing() {
+  ensure_file_writable "$LOG_FILE" "LOG file"
   local package_name="$1" # Get the tool name.
   log_info "Checking for package: $package_name"
   if ! command_exists brew; then
@@ -549,10 +554,11 @@ install_required_packages() {
 # =========================== MISE & JAVA SETUP ==========================
 
 configure_mise_environment() {
+  ensure_shell_profile_exists_and_writable
+  ensure_file_writable "$LOG_FILE" "LOG file"
   if [[ -z "$MISE_SHELL_TYPE" ]]; then
     log_error "Mise shell type (MISE_SHELL_TYPE) not set. Cannot configure mise environment."
   fi
-  ensure_shell_profile_exists_and_writable
   echo
   log_info "Configuring 'mise'..."
 
@@ -583,7 +589,7 @@ configure_mise_environment() {
 }
 
 install_java_with_mise() {
-
+  ensure_file_writable "$LOG_FILE" "LOG file"
   if [[ -z "$JDK_MISE_NAME" ]]; then
     log_error "JDK version not set."
   fi
@@ -651,6 +657,7 @@ install_java_with_mise() {
 # ========================== riverSpider SETUP ===========================
 
 ensure_secrets_initialized() {
+  
   if [[ -z "${RIVER_SPIDER_DIR}" || -z "${SECRET_FILE_NAME}" || -z "${TTPASM_APP_SCRIPT_DEFAULT_PASSWD}" ]]; then
     log_error "One or more required global variables (RIVER_SPIDER_DIR, SECRET_FILE_NAME, TTPASM_APP_SCRIPT_DEFAULT_PASSWD) are not set."
   fi
@@ -658,7 +665,7 @@ ensure_secrets_initialized() {
   ensure_file_writable "${file_path}" "${SECRET_FILE_NAME}"
   local file_content=$(<"${file_path}")
   if [[ -z $file_content ]]; then
-    echo "$TTPASM_APP_SCRIPT_DEFAULT_PASSWD" >"$file_path"
+    echo "${TTPASM_APP_SCRIPT_DEFAULT_PASSWD}" >"$file_path"
   fi
 }
 
@@ -676,14 +683,16 @@ clean_up_riverspider_download() {
 }
 
 download_and_extract_riverspider() {
-  if [[ -z "$RIVER_SPIDER_OUTPUT_FILE" || -z "$RIVER_SPIDER_ZIP_NAME" || -z "$RIVER_SPIDER_EXTRACT_DIRECTORY" || -z "$RIVER_SPIDER_TARGET_DIRECTORY" ]]; then
+  ensure_file_writable "$LOG_FILE" "LOG file"
+  if [[ -z "$RIVER_SPIDER_OUTPUT_FILE" || -z "$RIVER_SPIDER_ZIP_NAME" || -z "$RIVER_SPIDER_EXTRACT_DIRECTORY" || -z "$RIVER_SPIDER_TARGET_DIRECTORY" || -z "$RIVER_SPIDER_GOOGLE_DRIVE_FILE_ID" ]]; then
     log_error "Cann't download 'riverSpider'. See Canvas for download instructions."
   fi
-  log_info "Downloading 'riverSpider'..."
-  (curl -fsSL -o "$RIVER_SPIDER_OUTPUT_FILE" "https://drive.usercontent.google.com/download?id=${RIVER_SPIDER_GOOGLE_DRIVE_FILE_ID}&export=download&confirm=t" >>"$LOG_FILE" 2>&1) &
-  local download_pid=$!
-  progress_indicator "Downloading '${RIVER_SPIDER_ZIP_NAME}'" "$download_pid" "critical"
-
+  if [[ ! -f "$RIVER_SPIDER_OUTPUT_FILE" ]]; then
+    log_info "Downloading 'riverSpider'..."
+    (curl -fsSL -o "$RIVER_SPIDER_OUTPUT_FILE" "https://drive.usercontent.google.com/download?id=${RIVER_SPIDER_GOOGLE_DRIVE_FILE_ID}&export=download&confirm=t" >>"$LOG_FILE" 2>&1) &
+    local download_pid=$!
+    progress_indicator "Downloading '${RIVER_SPIDER_ZIP_NAME}'" "$download_pid" "critical"
+  fi
   mkdir -p "$RIVER_SPIDER_EXTRACT_DIRECTORY"
   (unzip "$RIVER_SPIDER_OUTPUT_FILE" -d "$RIVER_SPIDER_EXTRACT_DIRECTORY" >>"$LOG_FILE" 2>&1) &
   local unzip_pid=$!
@@ -734,12 +743,28 @@ set_river_spider_dir_variable() {
 
 # Tries to find the 'riverSpider' directory, which should contain 'submit.sh'.
 find_river_spider_directory() {
+  if [[ -z "$FIND_ATTEMPT_COUNT" || -z "$MAX_FIND_ATTEMPTS" ]]; then
+    log_error "FIND_ATTEMPT_COUNT or MAX_FIND_ATTEMPTS is not set. Cannot look for riverSpider directory."
+  fi
+
+  ((FIND_ATTEMPT_COUNT++))
+
+  if [[ $FIND_ATTEMPT_COUNT -gt $MAX_FIND_ATTEMPTS ]]; then
+    log_error "Exceeded maximum attempts to find 'riverSpider' directory."
+  fi
+  if [[ -z "$SUBMIT_SCRIPT_NAME" ]]; then
+    log_error "SUBMIT_SCRIPT_NAME is not set. Cannot search for riverSpider directory."
+  fi
+  if [[ -z "$RIVER_SPIDER_EXTRACT_DIRECTORY" ]]; then
+    log_error "RIVER_SPIDER_EXTRACT_DIRECTORY is not set. Cannot search for riverSpider directory."
+  fi
   if ! command_exists fd; then
     log_error "'fd' command not found. Cannot search for 'riverSpider' directory. Ensure 'fd' is installed."
   fi
   local temp_file
   local search_pid
   temp_file=$(mktemp) || log_error "Failed to create temporary file for search."
+  ensure_file_writable "$temp_file" "temp file"
   log_info "Attempting to locate the riverSpider project directory..."
   log_debug "Searching within '$HOME' for a directory named 'riverSpider' containing '$SUBMIT_SCRIPT_NAME'..."
   (fd --type f "$SUBMIT_SCRIPT_NAME" "$HOME" --exec dirname {} \; | grep --color=never "/riverSpider$" | head -n 1 >"$temp_file") &
@@ -804,6 +829,9 @@ update_paths_in_riverspider_submit_script() {
   fi
   if [[ -z "$SUBMIT_SCRIPT_NAME" ]]; then
     log_error "SUBMIT_SCRIPT_NAME ('$SUBMIT_SCRIPT_NAME') is not set or invalid. Cannot update submit script. Ensure project location was found."
+  fi
+  if [[ -z "$OLD_SECRETS_PATH_LINE" || -z "$OLD_WEBAPP_URL_PATH_LINE" || -z "$OLD_LOGISIM_JAR_PATH_LINE" || -z "$OLD_PROCESSOR_CIRC_PATH_LINE" || -z "$OLD_URLENCODE_SED_PATH_LINE" ]]; then
+    log_error "One or more required variables (OLD_SECRETS_PATH_LINE, OLD_WEBAPP_URL_PATH_LINE, OLD_LOGISIM_JAR_PATH_LINE, OLD_PROCESSOR_CIRC_PATH_LINE, OLD_URLENCODE_SED_PATH_LINE) are not set."
   fi
   ensure_file_writable "${RIVER_SPIDER_DIR}/${SUBMIT_SCRIPT_NAME}" "${SUBMIT_SCRIPT_NAME}"
   echo
