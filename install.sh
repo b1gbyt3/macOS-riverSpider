@@ -41,7 +41,7 @@ set -euo pipefail
 
 #  show/hide detailed progress
 readonly VERBOSE="false"
-
+readonly RIVER_SPIDER_DIR_NAME="riverSpider" # The name of the folder where 'riverSpider' is located.
 # --- Shell Settings Filenames ---
 # Default names for the shell configuration files.
 # You might need to change these if you use different filenames like '.zshrc' or '.bashrc'.
@@ -58,7 +58,7 @@ readonly RIVER_SPIDER_GOOGLE_DRIVE_FILE_ID="1g63nlTRa-Ibgj0ZUf3HX1fbdSrW90JBs"
 readonly RIVER_SPIDER_ZIP_NAME="riverSpiderForMac.zip"
 readonly RIVER_SPIDER_OUTPUT_FILE="${HOME}/${RIVER_SPIDER_ZIP_NAME}"
 readonly RIVER_SPIDER_EXTRACT_DIRECTORY="$(mktemp -d)"
-readonly RIVER_SPIDER_TARGET_DIRECTORY="${HOME}/riverSpider"
+readonly RIVER_SPIDER_TARGET_DIRECTORY="${HOME}/${RIVER_SPIDER_DIR_NAME}"
 
 # --- Relative Paths in submit.sh ---
 # These are the exact lines the script looks for in 'submit.sh'
@@ -77,6 +77,8 @@ readonly SECRET_FILE_NAME="secretString.txt"
 readonly WEBAPP_URL_FILE_NAME="webapp.url"
 readonly LOGISIM_JAR_FILE_NAME="logisim310.jar"
 readonly PROCESSOR_CIRC_FILE_NAME="processor0004.circ"
+readonly ALU_CIRC_FILE_NAME="alu.circ"
+readonly REGBANK_FILE_CIRC_FILE_NAME="regbank.circ"
 readonly URLENCODE_SED_FILE_NAME="urlencode.sed"
 readonly TEST_FILE_NAME="test.ttpasm"
 
@@ -668,23 +670,23 @@ ensure_secrets_initialized() {
 }
 
 clean_up_riverspider_download() {
-  if [ -d "${RIVER_SPIDER_EXTRACT_DIRECTORY}/riverSpider" ]; then
+  if [ -d "${RIVER_SPIDER_EXTRACT_DIRECTORY}/${RIVER_SPIDER_DIR_NAME}" ]; then
     log_debug "Moving contents to $RIVER_SPIDER_TARGET_DIRECTORY..."
     mkdir -p "$RIVER_SPIDER_TARGET_DIRECTORY"
-    mv "${RIVER_SPIDER_EXTRACT_DIRECTORY}/riverSpider/"* "$RIVER_SPIDER_TARGET_DIRECTORY/"
+    mv "${RIVER_SPIDER_EXTRACT_DIRECTORY}/${RIVER_SPIDER_DIR_NAME}/"* "$RIVER_SPIDER_TARGET_DIRECTORY/"
     rm -rf "$RIVER_SPIDER_EXTRACT_DIRECTORY" "$RIVER_SPIDER_OUTPUT_FILE"
     log_debug "Extraction and cleanup complete. Files are in $RIVER_SPIDER_TARGET_DIRECTORY"
     find_river_spider_directory
   else
-    log_error "Failed to download 'riverSpider'. See Canvas for download instructions."
+    log_error "Failed to download '${RIVER_SPIDER_DIR_NAME}'. See Canvas for download instructions."
   fi
 }
 
 download_and_extract_riverspider() {
   if [[ -z "$RIVER_SPIDER_OUTPUT_FILE" || -z "$RIVER_SPIDER_ZIP_NAME" || -z "$RIVER_SPIDER_EXTRACT_DIRECTORY" || -z "$RIVER_SPIDER_TARGET_DIRECTORY" ]]; then
-    log_error "Cann't download 'riverSpider'. See Canvas for download instructions."
+    log_error "Cann't download '${RIVER_SPIDER_DIR_NAME}'. See Canvas for download instructions."
   fi
-  log_info "Downloading 'riverSpider'..."
+  log_info "Downloading '${RIVER_SPIDER_DIR_NAME}'..."
   (curl -fsSL -o "$RIVER_SPIDER_OUTPUT_FILE" "https://drive.usercontent.google.com/download?id=${RIVER_SPIDER_GOOGLE_DRIVE_FILE_ID}&export=download&confirm=t" >>"$LOG_FILE" 2>&1) &
   local download_pid=$!
   progress_indicator "Downloading '${RIVER_SPIDER_ZIP_NAME}'" "$download_pid" "critical"
@@ -740,26 +742,26 @@ set_river_spider_dir_variable() {
 # Tries to find the 'riverSpider' directory, which should contain 'submit.sh'.
 find_river_spider_directory() {
   if ! command_exists fd; then
-    log_error "'fd' command not found. Cannot search for 'riverSpider' directory. Ensure 'fd' is installed."
+    log_error "'fd' command not found. Cannot search for '${RIVER_SPIDER_DIR_NAME}' directory. Ensure 'fd' is installed."
   fi
   local temp_file
   local search_pid
   temp_file=$(mktemp) || log_error "Failed to create temporary file for search."
-  log_info "Attempting to locate the riverSpider project directory..."
-  log_debug "Searching within '$HOME' for a directory named 'riverSpider' containing '$SUBMIT_SCRIPT_NAME'..."
-  (fd --type f "$SUBMIT_SCRIPT_NAME" "$HOME" --exec dirname {} \; | grep --color=never "/riverSpider$" | head -n 1 >"$temp_file") &
+  log_info "Attempting to locate the ${RIVER_SPIDER_DIR_NAME} project directory..."
+  log_debug "Searching within '$HOME' for a directory named '${RIVER_SPIDER_DIR_NAME}' containing '$SUBMIT_SCRIPT_NAME'..."
+  (fd --type f "$SUBMIT_SCRIPT_NAME" "$HOME" --exec dirname {} \; | grep --color=never "/${RIVER_SPIDER_DIR_NAME}$" | head -n 1 >"$temp_file") &
   search_pid=$!
-  progress_indicator "Searching for 'riverSpider' directory" "$search_pid"
+  progress_indicator "Searching for '${RIVER_SPIDER_DIR_NAME}' directory" "$search_pid"
   local potential_dir
   potential_dir=$(<"$temp_file")
   # Check if a directory path was found ('-n' checks if string is not empty)
   # AND if that path actually points to a directory ('-d' checks if it's a directory).
   if ! [[ -n "$potential_dir" && -d "$potential_dir" ]]; then
     download_and_extract_riverspider
-  elif [[ "$potential_dir" == "${RIVER_SPIDER_EXTRACT_DIRECTORY}/riverSpider" ]]; then
+  elif [[ "$potential_dir" == "${RIVER_SPIDER_EXTRACT_DIRECTORY}/${RIVER_SPIDER_DIR_NAME}" ]]; then
     clean_up_riverspider_download
   else
-    log_success "Found 'riverSpider' at $potential_dir"
+    log_success "Found '${RIVER_SPIDER_DIR_NAME}' at $potential_dir"
     RIVER_SPIDER_DIR="$potential_dir"
   fi
   ensure_secrets_initialized
@@ -812,7 +814,7 @@ update_paths_in_riverspider_submit_script() {
   fi
   ensure_file_writable "${RIVER_SPIDER_DIR}/${SUBMIT_SCRIPT_NAME}" "${SUBMIT_SCRIPT_NAME}"
   echo
-  log_info "Updating paths in the riverSpider submit script..."
+  log_info "Updating paths in the ${RIVER_SPIDER_DIR_NAME} submit script..."
   local new_secrets_path_line="secretPath=\"${RIVER_SPIDER_DIR}/${SECRET_FILE_NAME}\""
   local new_webapp_url_path_line="webappUrlPath=\"${RIVER_SPIDER_DIR}/${WEBAPP_URL_FILE_NAME}\""
   local new_logisim_jar_path_line="logisimPath=\"${RIVER_SPIDER_DIR}/${LOGISIM_JAR_FILE_NAME}\""
@@ -839,57 +841,57 @@ add_river_spider_shell_helper_function() {
     log_success "'$helper_function_name' helper function already in shell profile"
   else
     log_info "Adding River Spider helper function..."
-    cat <<'EOF' >>"$SHELL_PROFILE_FILE"
+    read -r -d '' HELPER_FUNCTIONS <<-EOF
 #=======  River Spider helper function =======
 riverspider() {
-  local ttpasm_file=$1
-  if [[ -z "$ttpasm_file" || "$1" == "-h" || "$1" == "--help" ]]; then
+  local ttpasm_file=\$1
+  if [[ -z "\${ttpasm_file}" || "\$1" == "-h" || "\$1" == "--help" ]]; then
     echo "Usage: riverspider <filename>.ttpasm"
     return 1
   fi
-  if [[ "${ttpasm_file##*.}" != "ttpasm" ]]; then
+  if [[ "\${ttpasm_file##*.}" != "ttpasm" ]]; then
     echo "Error: File must have .ttpasm extension."
     return 1
   fi
-  if [[ ! -f "$ttpasm_file" ]]; then
-    echo "Error: File '$ttpasm_file' not found."
+  if [[ ! -f "\${ttpasm_file}" ]]; then
+    echo "Error: File '\${ttpasm_file}' not found."
     return 1
   fi
   locate_riverspider_dir || return 1
-  "$RIVER_SPIDER_DIR/submit.sh" "$(realpath "$ttpasm_file")"
+  "\${RIVER_SPIDER_DIR}/${SUBMIT_SCRIPT_NAME}" "\$(realpath "\${ttpasm_file}")"
 }
 locate_riverspider_dir() {
-  if [[ -z "${RIVER_SPIDER_DIR:-}" || ! -d "$RIVER_SPIDER_DIR" ]]; then
-    RIVER_SPIDER_DIR=$(fd --type f submit.sh "$HOME" --exec dirname {} \; | grep "/riverSpider$" | head -n 1)
-    if [[ -z "$RIVER_SPIDER_DIR" || ! -d "$RIVER_SPIDER_DIR" ]]; then
-      echo "Error: Could not locate the riverSpider directory."
+  if [[ -z "\${RIVER_SPIDER_DIR:-}" || ! -d "\${RIVER_SPIDER_DIR}" ]]; then
+    RIVER_SPIDER_DIR=\$(fd --type f submit.sh "\$HOME" --exec dirname {} \; | grep "/${RIVER_SPIDER_DIR_NAME}$" | head -n 1)
+    if [[ -z "\${RIVER_SPIDER_DIR}" || ! -d "\${RIVER_SPIDER_DIR}" ]]; then
+      echo "Error: Could not locate the ${RIVER_SPIDER_DIR_NAME} directory."
       echo "See Canvas for download instructions."
       return 1
     fi
     export RIVER_SPIDER_DIR
-    add_riverspider_to_profile "export RIVER_SPIDER_DIR=\"$RIVER_SPIDER_DIR\""
+    add_riverspider_to_profile "export RIVER_SPIDER_DIR=\"\${RIVER_SPIDER_DIR}\""
   fi
 }
 add_riverspider_to_profile() {
-  local line_to_set="$1"
+  local line_to_set="\$1"
   local pattern_to_find="^export RIVER_SPIDER_DIR="
-  local current_shell="$(basename "${SHELL:-}")"
+  local current_shell="\$(basename "\${SHELL:-}")"
   local shell_profile=""
-  case "$current_shell" in
-    zsh) shell_profile="${ZDOTDIR:-$HOME}/.zprofile" ;;
-    bash) shell_profile="$HOME/.bash_profile" ;;
+  case "\${current_shell}" in
+    zsh) shell_profile="\${ZDOTDIR:-\$HOME}/${ZSH_PROFILE_BASENAME}" ;;
+    bash) shell_profile="\$HOME/${BASH_PROFILE_BASENAME}" ;;
   esac
-  if [[ -z "$shell_profile" || ! -f "$shell_profile" ]]; then
+  if [[ -z "\${shell_profile}" || ! -f "\${shell_profile}" ]]; then
     echo "Could not add RIVER_SPIDER_DIR to shell profile."
-    echo "Add manually: $line_to_set"
+    echo "Add manually: \${line_to_set}"
     return 0
   fi
-  if grep -q "$pattern_to_find" "$shell_profile"; then
-    sed -i'' -e "s#${pattern_to_find}.*#${line_to_set}#" "$shell_profile" ||
-      echo "Could not add RIVER_SPIDER_DIR to $shell_profile. Add manually: $line_to_set"
+  if grep -q "\${pattern_to_find}" "\${shell_profile}"; then
+    sed -i'' -e "s#\${pattern_to_find}.*#\${line_to_set}#" "\${shell_profile}" ||
+      echo "Could not add RIVER_SPIDER_DIR to \${shell_profile}. Add manually: \${line_to_set}"
   else
-    { echo ""; echo "$line_to_set"; echo "";} >> "$shell_profile" ||
-      echo "Could not add RIVER_SPIDER_DIR to $shell_profile. Add manually: $line_to_set"
+    { echo ""; echo "\${line_to_set}"; echo "";} >> "\${shell_profile}" ||
+      echo "Could not add RIVER_SPIDER_DIR to \${shell_profile}. Add manually: \${line_to_set}"
   fi
 }
 #=============================================
@@ -897,60 +899,59 @@ add_riverspider_to_profile() {
 #=======  Logisim helper function =======
 
 logisim() {
-  if [[ "$#" -eq 0 ]]; then
-    java -jar "$RIVER_SPIDER_DIR/logisim310.jar"
-    return $?
+  if [[ "\$#" -eq 0 ]]; then
+    java -jar "\${RIVER_SPIDER_DIR}/${LOGISIM_JAR_FILE_NAME}"
+    return \$?
   fi
 
-  local arg1="$1"
+  local arg1="\$1"
 
-  if [[ "$arg1" == "-h" || "$arg1" == "--help" ]]; then
+  if [[ "\${arg1}" == "-h" || "\${arg1}" == "--help" ]]; then
     echo "Usage: logisim [<filename.circ>]"
     echo "       logisim -h | --help     Show this help message"
     echo ""
     return 1
   fi
 
-  if [[ "${arg1##*.}" != "circ" ]]; then
-    echo "Error: File '$arg1' must have a .circ extension." >&2
+  if [[ "\${arg1##*.}" != "circ" ]]; then
+    echo "Error: File '\$arg1' must have a .circ extension." >&2
     return 1
   fi
 
-  if [[ ! -f "$arg1" ]]; then
-    echo "Error: File '$arg1' not found." >&2
+  if [[ ! -f "\${arg1}" ]]; then
+    echo "Error: File '\${arg1]' not found." >&2
     return 1
   fi
 
-  java -jar "$RIVER_SPIDER_DIR/logisim310.jar" "$arg1"
+  java -jar "\${RIVER_SPIDER_DIR}/${LOGISIM_JAR_FILE_NAME}" "\${arg1}"
   
-  return $? 
+  return \$? 
 }
 
 logproc(){
-  java -jar "$RIVER_SPIDER_DIR/logisim310.jar" "$RIVER_SPIDER_DIR/processor0004.circ"
+  java -jar "\${RIVER_SPIDER_DIR}/${LOGISIM_JAR_FILE_NAME}" "\${RIVER_SPIDER_DIR}/${PROCESSOR_CIRC_FILE_NAME}"
 }
 
 logalu(){
-  java -jar "$RIVER_SPIDER_DIR/logisim310.jar" "$RIVER_SPIDER_DIR/alu.circ"
+  java -jar "\${RIVER_SPIDER_DIR}/${LOGISIM_JAR_FILE_NAME}" "\${RIVER_SPIDER_DIR}/${ALU_CIRC_FILE_NAME}"
 }
 
 logreg(){
-  java -jar "$RIVER_SPIDER_DIR/logisim310.jar" "$RIVER_SPIDER_DIR/regbank.circ"
+  java -jar "\${RIVER_SPIDER_DIR}/${LOGISIM_JAR_FILE_NAME}" "\${RIVER_SPIDER_DIR}/${REGBANK_FILE_CIRC_FILE_NAME}"
 }
 
 #========================================
 EOF
 
-    echo "" >>"$SHELL_PROFILE_FILE"
-    sed -i '' -e "s#zsh) shell_profile=.*#zsh) shell_profile=\"\${ZDOTDIR:-\$HOME}/${ZSH_PROFILE_BASENAME}\" ;;#" "$SHELL_PROFILE_FILE" ||
-      log_warning "Could not update shell_profile for ZSH in $SHELL_PROFILE_FILE. Add manually: $ZSH_PROFILE_BASENAME"
-    sed -i '' -e "s#bash) shell_profile=.*#bash) shell_profile=\"\$HOME/${BASH_PROFILE_BASENAME}\" ;;#" "$SHELL_PROFILE_FILE" ||
-      log_warning "Could not update shell_profile for BASH in $SHELL_PROFILE_FILE. Add manually: $BASH_PROFILE_BASENAME"
-    if grep -q "${helper_function_name}()" "$SHELL_PROFILE_FILE"; then
-      log_success "Added '$helper_function_name' helper function to shell profile"
-      log_debug "Confirmed '$helper_function_name' helper function exists in $SHELL_PROFILE_FILE."
+    if [[ -z "${HELPER_FUNCTIONS}" ]]; then
+      log_error "Failed to create helper function content."
+    fi
+    echo "${HELPER_FUNCTIONS}" >>"${SHELL_PROFILE_FILE}"
+    if grep -q "${helper_function_name}()" "${SHELL_PROFILE_FILE}"; then
+      log_success "Added '${helper_function_name}' helper function to shell profile"
+      log_debug "Confirmed '${helper_function_name}' helper function exists in ${SHELL_PROFILE_FILE}."
     else
-      log_warning "Failed to add '$helper_function_name' helper function."
+      log_warning "Failed to add '${helper_function_name}' helper function."
     fi
   fi
 }
@@ -963,7 +964,7 @@ display_startup_message() {
   echo "Setup started at ${START_TIMESTAMP}" >>"$LOG_FILE"
   echo "───────────────────────────────────────────────" >>"$LOG_FILE"
   echo "================================================="
-  log_info "Starting riverSpider setup script"
+  log_info "Starting ${RIVER_SPIDER_DIR_NAME} setup script"
   log_info "Setup started at: ${START_TIMESTAMP}"
   log_info "Setup logfile:    $LOG_FILE"
   echo "================================================="
@@ -975,7 +976,7 @@ display_completion_message() {
   local end_timestamp="$(date +%Y-%m-%d_%H:%M:%S)"
   printf "\n"
   log_info "================================================="
-  log_info "         riverSpider Setup Complete"
+  log_info "         ${RIVER_SPIDER_DIR_NAME} Setup Complete"
   log_info "================================================="
   printf "\n"
   log_info "${tty_bold}---All automated setup steps finished.---${tty_reset}"
@@ -1115,14 +1116,14 @@ main() {
   log_success "Dependency installation complete."
   echo
   echo
-  log_info "=== PHASE 3: 'riverSpider' Setup ==="
+  log_info "=== PHASE 3: '${RIVER_SPIDER_DIR_NAME}' Setup ==="
   echo "───────────────────────────────────────────────"
   find_river_spider_directory               # Find or download the riverSpider folder.
   set_river_spider_dir_variable             # Always remember where the riverSpider folder is.
   update_paths_in_riverspider_submit_script # Fix paths inside submit.sh (so it can be called from anywhere)
   add_river_spider_shell_helper_function    # Add the 'riverspider' command.
   echo "───────────────────────────────────────────────"
-  log_success "'riverSpider' configuration complete."
+  log_success "'${RIVER_SPIDER_DIR_NAME}' configuration complete."
   echo
 
   # Show the final "all done" message.
