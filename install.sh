@@ -1,10 +1,10 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # ======================================================================================================================================
 # riverSpider macOS Setup Script
 #
 # Author: Ilya Babenko
 # Last updated: 2025-05-07
-# Version: 2.3.7
+# Version: 2.3.9
 #
 # What this script does:
 # This script helps set up the riverSpider on your Mac automatically.
