@@ -3,8 +3,8 @@
 # riverSpider macOS Setup Script
 #
 # Author: Ilya Babenko
-# Last updated: 2025-05-03
-# Version: 2.3.4
+# Last updated: 2025-05-07
+# Version: 2.3.7
 #
 # What this script does:
 # This script helps set up the riverSpider on your Mac automatically.
@@ -102,6 +102,7 @@ readonly INTEL_HOMEBREW_PATH="/usr/local/bin/brew"  # Usual place on Intel Macs
 readonly REQUIRED_SYSTEM_COMMANDS=("mkdir" "rm" "dirname" "basename" "realpath" "touch" "cat" "echo" "printf" "head" "ping" "curl" "unzip" "git" "uname" "sw_vers" "grep" "sed" "tr" "sleep")
 # Java that WORKS with logisim
 readonly JDK_MISE_NAME="java@openjdk"
+readonly JDK_MISE_BACKUP_VERSION="openjdk-19.0.2"
 readonly HOMEBREW_PACKAGES_TO_INSTALL=("coreutils" "wget" "mise" "fd")
 # Ensure tools are working after installation.
 readonly INSTALLED_TOOLS_TO_VERIFY=("timeout" "wget" "mise" "fd")
@@ -549,7 +550,7 @@ install_required_packages() {
 # =========================== MISE & JAVA SETUP ==========================
 
 configure_mise_environment() {
-  if [[ -z "$MISE_SHELL_TYPE" ]]; then
+  if [[ -z "${MISE_SHELL_TYPE}" ]]; then
     log_error "Mise shell type (MISE_SHELL_TYPE) not set. Cannot configure mise environment."
   fi
   ensure_shell_profile_exists_and_writable
@@ -560,22 +561,23 @@ configure_mise_environment() {
   if ! command_exists "mise"; then
     log_error "'mise' command not found. Cannot configure mise environment. Ensure mise setup was successful."
   fi
-  local mise_executable="$(command -v mise)"
+  local mise_executable
+  mise_executable="$(command -v mise)"
 
-  log_debug "mise executable found at: $mise_executable"
+  log_debug "mise executable found at: ${mise_executable}"
 
   local mise_activate_line="eval \"\$(${mise_executable} activate ${MISE_SHELL_TYPE})\""
-  log_debug "mise activation line to add/check in profile: $mise_activate_line"
+  log_debug "mise activation line to add/check in profile: ${mise_activate_line}"
 
   # Add this line to the profile file if it's not there.
-  if ! add_line_if_missing "$mise_activate_line" "$SHELL_PROFILE_FILE"; then
-    log_error "Failed to add mise activation line to '$SHELL_PROFILE_FILE'."
+  if ! add_line_if_missing "${mise_activate_line}" "${SHELL_PROFILE_FILE}"; then
+    log_error "Failed to add mise activation line to '${SHELL_PROFILE_FILE}'."
   fi
 
   # Activate 'mise' for the current script session so we can use it to install Java.
   log_debug "Activating mise for the current script session..."
   # Run the activation command using 'eval'. Check if it succeeds.
-  if $mise_executable activate >>"$LOG_FILE" 2>&1; then
+  if "${mise_executable}" activate >>"${LOG_FILE}" 2>&1; then
     log_success "mise environment configured and active for this session."
   else
     log_error "Failed to activate mise environment."
@@ -584,7 +586,7 @@ configure_mise_environment() {
 
 install_java_with_mise() {
 
-  if [[ -z "$JDK_MISE_NAME" ]]; then
+  if [[ -z "${JDK_MISE_NAME}" ]]; then
     log_error "JDK version not set."
   fi
   echo
@@ -593,55 +595,58 @@ install_java_with_mise() {
   if ! command_exists "mise"; then
     log_error "'mise' command not found. Cannot install Java. Ensure mise setup was successful."
   fi
-  local mise_executable="$(command -v mise)"
+  local mise_executable
+  mise_executable="$(command -v mise)"
 
-  log_debug "Using mise executable: $mise_executable"
+  log_debug "Using mise executable: ${mise_executable}"
 
   # Ask 'mise' for the latest recommended version of OpenJDK.
-  log_debug "Determining latest recommended Java version using 'mise latest $JDK_MISE_NAME'..."
+  log_debug "Determining latest recommended Java version using 'mise latest ${JDK_MISE_NAME}'..."
   local latest_jdk_version=""
   # Run 'mise latest'. Send errors to log file ('2>>'). Check if command succeeded ('!').
-  if ! latest_jdk_version=$("$mise_executable" latest "$JDK_MISE_NAME" 2>>"$LOG_FILE"); then
-    log_error "Failed to determine the latest Java version. See log: $LOG_FILE"
+  if ! latest_jdk_version=$("${mise_executable}" latest "${JDK_MISE_NAME}" 2>>"$LOG_FILE"); then
+    log_warning "Failed to determine the latest Java version. See log: $LOG_FILE"
   fi
   # Check if 'mise latest' returned an actual version number.
-  if [[ -z "$latest_jdk_version" ]]; then
-    log_error "Failed to determine the latest Java version. See log: $LOG_FILE"
+  if [[ -z "${latest_jdk_version}" ]]; then
+    latest_jdk_version="${JDK_MISE_BACKUP_VERSION}"
+    log_warning "Failed to determine the latest Java version. See log: ${LOG_FILE}"
+  else
+    log_info "Latest recommended Java version: ${latest_jdk_version}"
   fi
-  log_info "Latest recommended Java version: $latest_jdk_version"
 
   # Combine the tool name and version (e.g., "java@openjdk@21.0.3").
-  local jdk_tool_version="java@$latest_jdk_version"
+  local jdk_tool_version="java@${latest_jdk_version}"
   log_debug "Full tool@version string for mise: $jdk_tool_version"
 
   # Tell 'mise' to install this Java version.
-  log_debug "Running command: $mise_executable install $jdk_tool_version"
+  log_debug "Running command: ${mise_executable} install ${jdk_tool_version}"
   # Run in background, send output to log, show progress.
-  ("$mise_executable" install "$jdk_tool_version" >>"$LOG_FILE" 2>&1) &
+  ("${mise_executable}" install "${jdk_tool_version}" >>"${LOG_FILE}" 2>&1) &
   local installer_pid=$!
 
-  progress_indicator "Installing Java $latest_jdk_version" "$installer_pid" "critical"
+  progress_indicator "Installing Java ${latest_jdk_version}" "${installer_pid}" "critical"
 
-  log_info "Setting Java $latest_jdk_version as the global default version..."
-  log_debug "Running command: $mise_executable use --global $jdk_tool_version"
+  log_info "Setting Java ${latest_jdk_version} as the global default version..."
+  log_debug "Running command: ${mise_executable} use --global ${jdk_tool_version}"
   # Run 'mise use --global'. Send output to log. Check success.
   if "$mise_executable" use --global "$jdk_tool_version" >>"$LOG_FILE" 2>&1; then
     log_success "Successfully set Java ${latest_jdk_version} as the global default."
   else
-    log_error "Failed to set Java ${latest_jdk_version} as the global default. Check log: $LOG_FILE"
+    log_error "Failed to set Java ${latest_jdk_version} as the global default. Check log: ${LOG_FILE}"
   fi
 
   # Check if Java works correctly now.
   log_info "Verifying Java installation..."
   # Run 'java -version' using 'mise exec' to ensure it uses the mise environment.
-  log_debug "Running command: $mise_executable exec -- java -version"
+  log_debug "Running command: ${mise_executable} exec -- java -version"
   local java_version_output=""
-  if java_version_output=$("$mise_executable" exec -- java -version 2>&1 | head -n 1); then
+  if java_version_output=$("${mise_executable}" exec -- java -version 2>&1 | head -n 1); then
     log_success "Java installation verified successfully using 'mise exec'."
-    log_debug "Java: $java_version_output"
+    log_debug "Java: ${java_version_output}"
     log_success "Java ${latest_jdk_version} is ready"
   else
-    log_warning "Java verification failed. Check log: $LOG_FILE"
+    log_warning "Java verification failed. Check log: ${LOG_FILE}"
     echo "You can try verifying manually after restarting your terminal by running: java -version"
   fi
 }
