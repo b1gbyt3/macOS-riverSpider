@@ -101,7 +101,7 @@ readonly INTEL_HOMEBREW_PATH="/usr/local/bin/brew"  # Usual place on Intel Macs
 
 # --- Needed Commands & Tools ---
 # Basic commands the script expects to find on the Mac.
-readonly REQUIRED_SYSTEM_COMMANDS=("mkdir" "rm" "dirname" "basename" "realpath" "touch" "cat" "echo" "printf" "head" "ping" "curl" "unzip" "git" "uname" "sw_vers" "grep" "sed" "tr" "sleep")
+readonly REQUIRED_SYSTEM_COMMANDS=("mkdir" "open" "rm" "dirname" "basename" "realpath" "touch" "cat" "echo" "printf" "head" "ping" "curl" "unzip" "git" "uname" "sw_vers" "grep" "sed" "tr" "sleep")
 # Java that WORKS with logisim
 readonly JDK_MISE_NAME="java@openjdk"
 readonly JDK_MISE_BACKUP_VERSION="openjdk-19.0.2"
@@ -1104,11 +1104,13 @@ display_completion_message() {
 # This part of the setup cannot be automated by the script.
 display_google_apps_script_setup_instructions() {
   if [[ "${QUIET}" == "false" ]]; then
+    open "${GOOGLE_SHEETS_DOC_URL}" 2>/dev/null || log_warning "Failed to open Google Sheets document URL in browser."
     log_info "${TTY_BOLD}--- Manual Google App Script Setup Instructions ---${TTY_RESET}"
     echo ""
     echo "${TTY_YELLOW}Step 1: Make a Copy of the Google Sheet${TTY_RESET}"
-    echo "  1. Go to the following URL:"
+    echo "  1. Go to the following URL (opens automatically):"
     echo "     ${TTY_GREEN}${GOOGLE_SHEETS_DOC_URL}${TTY_RESET}"
+    echo "     (If it doesn't open, copy and paste it into your browser)."
     echo "     Make sure you are signed in with your ${TTY_BOLD}Los Rios account${TTY_RESET}."
     echo "  2. In Google Sheets, go to the menu:"
     echo "     ${TTY_BOLD}File > Make a copy${TTY_RESET}"
