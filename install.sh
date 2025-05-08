@@ -39,9 +39,8 @@ set -euo pipefail
 
 # ===========================   OK TO CHANGE   ===========================
 
-#  show/hide detailed progress
-readonly VERBOSE="false"
-readonly RIVER_SPIDER_DIR_NAME="riverSpider" # The name of the folder where 'riverSpider' is located.
+# The name of the folder where 'riverSpider' is located.
+readonly RIVER_SPIDER_DIR_NAME="riverSpider"
 # --- Shell Settings Filenames ---
 # Default names for the shell configuration files.
 # You might need to change these if you use different filenames like '.zshrc' or '.bashrc'.
@@ -80,7 +79,6 @@ readonly PROCESSOR_CIRC_FILE_NAME="processor0004.circ"
 readonly ALU_CIRC_FILE_NAME="alu.circ"
 readonly REGBANK_FILE_CIRC_FILE_NAME="regbank.circ"
 readonly URLENCODE_SED_FILE_NAME="urlencode.sed"
-readonly TEST_FILE_NAME="test.ttpasm"
 
 # =======================  END OK TO CHANGE  ========================
 
@@ -118,6 +116,10 @@ readonly CHECK_DOMAINS=("www.google.com" "www.apple.com" "github.com")
 # These get their actual values while the script runs.
 # Declaring them here makes it clear what information the script keeps track of.
 
+declare DEBUG="false" # If true, shows debug info in the terminal window.
+# can be enabled by running the script with the '-d' or '--debug' option.
+declare QUIET="false" # If true, suppresses all output except errors.
+
 declare CURRENT_SHELL=""          # Which shell is being used ("zsh" or "bash").
 declare SHELL_PROFILE_FILE=""     # Full path to the shell's settings file (like ~/.zprofile).
 declare HOMEBREW_PATH=""          # Where the Homebrew 'brew' command is located.
@@ -125,6 +127,13 @@ declare PROCESSOR_ARCHITECTURE="" # The computer's chip type ("arm64" or "x86_64
 declare CHIP_TYPE=""              # A friendly name for the chip ("Apple Silicon" or "Intel Processor").
 declare MISE_SHELL_TYPE=""        # The shell name 'mise' needs ("zsh" or "bash").
 declare RIVER_SPIDER_DIR=""       # Full path to where the 'riverSpider' folder was found.
+
+declare TTY_BLUE=""   # Blue color for terminal messages.
+declare TTY_RED=""    # Red color for terminal messages.
+declare TTY_YELLOW="" # Yellow color for terminal messages.
+declare TTY_GREEN=""  # Green color for terminal messages.
+declare TTY_BOLD=""   # Bold text for terminal messages.
+declare TTY_RESET=""  # Reset text color for terminal messages.
 # ===================================================================
 
 # =========================== HELPER UTILITIES ===========================
@@ -208,6 +217,29 @@ add_line_if_missing() {
   echo "[DEBUG] $line - already exists in $file" >>"$LOG_FILE"
 }
 
+print_separator() {
+  if [[ "${QUIET}" == "false" ]]; then
+    echo "───────────────────────────────────────────────"
+  fi
+}
+
+print_newline() {
+  if [[ "${QUIET}" == "false" ]]; then
+    echo
+  fi
+}
+
+print_help() {
+  local script_name
+  script_name=$(basename "$0")
+  echo "Usage: ${script_name} [options]"
+  echo ""
+  echo "Options:"
+  echo "  -d, --debug      Enable debug output."
+  echo "  -q, --quiet      Suppress normal output (quiet mode)."
+  echo "  -h, --help       Display this help message :)"
+}
+
 # ========================================================================
 
 # ==========================  MESSAGE HELPERS  ===========================
@@ -221,54 +253,60 @@ setup_terminal_colors() {
 
   tty_mkbold() { tty_escape "1;$1"; }
 
-  tty_blue=$(tty_mkbold 34)   # Blue color
-  tty_red=$(tty_mkbold 31)    # Red color
-  tty_yellow=$(tty_mkbold 33) # Yellow color
-  tty_green=$(tty_mkbold 32)  # Green color
-  tty_bold=$(tty_mkbold 39)   # Bold text
-  tty_reset=$(tty_escape 0)   # Reset text to normal
+  TTY_BLUE=$(tty_mkbold 34)   # Blue color
+  TTY_RED=$(tty_mkbold 31)    # Red color
+  TTY_YELLOW=$(tty_mkbold 33) # Yellow color
+  TTY_GREEN=$(tty_mkbold 32)  # Green color
+  TTY_BOLD=$(tty_mkbold 39)   # Bold text
+  TTY_RESET=$(tty_escape 0)   # Reset text to normal
 }
 
 log_info() {
-  local msg="$*"
   ensure_file_writable "$LOG_FILE" "LOG file"
-  printf "${tty_blue}==>${tty_bold} %s${tty_reset}\n" "$msg"
-  echo "[INFO] $msg" >>"$LOG_FILE"
+  local msg="$*"
+  if [[ "${QUIET}" == "false" ]]; then
+    printf "${TTY_BLUE}==>${TTY_BOLD} %s${TTY_RESET}\n" "${msg}"
+  fi
+  echo "[INFO] ${msg}" >>"${LOG_FILE}"
 }
 
 log_success() {
-  local msg="$*"
   ensure_file_writable "$LOG_FILE" "LOG file"
-  printf "${tty_green}✓${tty_reset} %s\n" "$msg"
-  echo "[SUCCESS] $msg" >>"$LOG_FILE"
+  local msg="$*"
+  if [[ "${QUIET}" == "false" ]]; then
+    printf "${TTY_GREEN}✓${TTY_RESET} %s\n" "${msg}"
+  fi
+  echo "[SUCCESS] ${msg}" >>"${LOG_FILE}"
 }
 
 log_warning() {
-  local msg="$*"
   ensure_file_writable "$LOG_FILE" "LOG file"
-  printf "${tty_yellow}Warning${tty_reset}: %s\n" "$msg" >&2
-  echo "[WARNING] $msg" >>"$LOG_FILE"
+  local msg="$*"
+  printf "${TTY_YELLOW}Warning${TTY_RESET}: %s\n" "${msg}" >&2
+  echo "[WARNING] ${msg}" >>"${LOG_FILE}"
 }
 
 # Shows error messages and stops the script.
 log_error() {
-  local abort_timestamp="$(date +%Y%m%d_%H%M%S)"
-  local msg="$*"
   ensure_file_writable "$LOG_FILE" "LOG file"
-  printf "${tty_red}Error${tty_reset}: %s\n" "$msg" >&2
-  echo "[ERROR] $msg" >>"$LOG_FILE"
-  echo "[ERROR] Script aborted at ${abort_timestamp}" >>"$LOG_FILE"
-  echo "[ERROR] Script aborted at ${abort_timestamp} check logfile $LOG_FILE"
+  local abort_timestamp
+  abort_timestamp="$(date +%Y%m%d_%H%M%S)"
+  local msg="$*"
+  printf "${TTY_RED}Error${TTY_RESET}: %s\n" "${msg}" >&2
+  echo "[ERROR] ${msg}" >>"${LOG_FILE}"
+  echo "[ERROR] Script aborted at ${abort_timestamp}" >>"${LOG_FILE}"
+  echo "[ERROR] Script aborted at ${abort_timestamp}. Check log file: ${LOG_FILE}" >&2
   exit 1
 }
 
 # Writes extra details (debug info) only to the log file.
 log_debug() {
-  if [[ "$VERBOSE" == "true" ]]; then
+  ensure_file_writable "$LOG_FILE" "LOG file"
+  local debug_mode="${DEBUG:-false}"
+  if [[ "${debug_mode}" == "true" && "${QUIET}" == "false" ]]; then
     echo "[DEBUG] $*"
   fi
-  ensure_file_writable "$LOG_FILE" "LOG file"
-  echo "[DEBUG] $*" >>"$LOG_FILE"
+  echo "[DEBUG] $*" >>"${LOG_FILE}"
 }
 # ========================================================================
 
@@ -382,27 +420,27 @@ progress_indicator() {
   local critical="${3:-false}"
   local spin_chars='-\|/' # Characters for the spinner animation.
   local i=0               # Counter for which character to show.
-  log_debug "Starting progress indicator for PID $background_pid (Task: $task_name)"
+  log_debug "Starting progress indicator for PID ${background_pid} (Task: ${task_name}, Critical: $([[ "${critical}" == "critical" ]] && echo true || echo false))"
+  if [[ "${QUIET}" == "false" ]]; then
 
-  # Keep spinning as long as the background process is still running.
-  # 'kill -0 $pid' checks if the process exists without stopping it. '2>/dev/null' hides errors.
-  while kill -0 $background_pid 2>/dev/null; do
-    i=$(((i + 1) % 4)) # Cycle through the 4 spinning characters.
-    # '\r' moves the cursor back to the start of the line to overwrite.
-    # '${spin:$i:1}' gets one character from the 'spin' string at position 'i'.
-    printf "\r %s %c " "$task_name" "${spin_chars:$i:1}"
-    sleep 0.1 # Wait a very short time (0.1 seconds) before the next spin update.
-  done
-  # After the process finishes, clear the spinning line
-  printf "\r                                   \r"
-
+    # Keep spinning as long as the background process is still running.
+    # 'kill -0 $pid' checks if the process exists without stopping it. '2>/dev/null' hides errors.
+    while kill -0 $background_pid 2>/dev/null; do
+      i=$(((i + 1) % 4)) # Cycle through the 4 spinning characters.
+      # '\r' moves the cursor back to the start of the line to overwrite.
+      # '${spin:$i:1}' gets one character from the 'spin' string at position 'i'.
+      printf "\r %s %c " "$task_name" "${spin_chars:$i:1}"
+      sleep 0.1 # Wait a very short time (0.1 seconds) before the next spin update.
+    done
+    # After the process finishes, clear the spinning line
+    printf "\r                                   \r"
+  fi
   local exit_status=0
   # 'wait $pid' waits for the background process to fully finish and gets its exit code.
   # The exit code tells us if the process succeeded (0) or failed (non-zero).
   wait "$background_pid" || exit_status=$?
 
-  log_debug "PID $background_pid ($task_name) finished with exit status $exit_status."
-
+  log_debug "PID ${background_pid} ('${task_name}') finished with exit status ${exit_status}."
   # Check if the background process finished successfully (exit code 0).
   if [ $exit_status -eq 0 ]; then
     task_name=$(echo "$task_name" | sed 's/Downloading /downloaded /; s/Unzipping /unzipped /; s/Installing /installed /; s/Searching for /found /; s/Homebrew Update/updated Homebrew/')
@@ -518,7 +556,7 @@ verify_installed_tools() {
   if [[ -z "$INSTALLED_TOOLS_TO_VERIFY" ]]; then
     log_error "Missing tools to verify."
   fi
-  echo
+  print_newline
   log_info "Verifying packages installation..."
   local missing_tools=()
   for tool_name in "${INSTALLED_TOOLS_TO_VERIFY[@]}"; do
@@ -538,7 +576,7 @@ install_required_packages() {
   if [[ -z "$HOMEBREW_PACKAGES_TO_INSTALL" ]]; then
     log_error "No packages set to install."
   fi
-  echo
+  print_newline
   log_info "Installing required packages..."
   for package_name in "${HOMEBREW_PACKAGES_TO_INSTALL[@]}"; do
     if ! install_homebrew_package_if_missing "$package_name"; then
@@ -556,7 +594,7 @@ configure_mise_environment() {
     log_error "Mise shell type (MISE_SHELL_TYPE) not set. Cannot configure mise environment."
   fi
   ensure_shell_profile_exists_and_writable
-  echo
+  print_newline
   log_info "Configuring 'mise'..."
 
   # Find where the 'mise' command is located.
@@ -591,7 +629,7 @@ install_java_with_mise() {
   if [[ -z "${JDK_MISE_NAME}" ]]; then
     log_error "JDK version not set."
   fi
-  echo
+  print_newline
   log_info "Downloading Java..."
 
   if ! command_exists "mise"; then
@@ -813,7 +851,7 @@ update_paths_in_riverspider_submit_script() {
     log_error "SUBMIT_SCRIPT_NAME ('$SUBMIT_SCRIPT_NAME') is not set or invalid. Cannot update submit script. Ensure project location was found."
   fi
   ensure_file_writable "${RIVER_SPIDER_DIR}/${SUBMIT_SCRIPT_NAME}" "${SUBMIT_SCRIPT_NAME}"
-  echo
+  print_newline
   log_info "Updating paths in the ${RIVER_SPIDER_DIR_NAME} submit script..."
   local new_secrets_path_line="secretPath=\"${RIVER_SPIDER_DIR}/${SECRET_FILE_NAME}\""
   local new_webapp_url_path_line="webappUrlPath=\"${RIVER_SPIDER_DIR}/${WEBAPP_URL_FILE_NAME}\""
@@ -833,7 +871,7 @@ update_paths_in_riverspider_submit_script() {
 # This command makes running the main submit.sh script simpler.
 add_river_spider_shell_helper_function() {
   ensure_shell_profile_exists_and_writable
-  echo
+  print_newline
   log_info "Setting up River Spider helper function..."
   local helper_function_name="riverspider"
 
@@ -963,168 +1001,205 @@ display_startup_message() {
   echo "───────────────────────────────────────────────" >"$LOG_FILE"
   echo "Setup started at ${START_TIMESTAMP}" >>"$LOG_FILE"
   echo "───────────────────────────────────────────────" >>"$LOG_FILE"
-  echo "================================================="
-  log_info "Starting ${RIVER_SPIDER_DIR_NAME} setup script"
-  log_info "Setup started at: ${START_TIMESTAMP}"
-  log_info "Setup logfile:    $LOG_FILE"
-  echo "================================================="
-  echo
-  echo
+   if [[ "${QUIET}" == "false" ]]; then
+    echo "================================================="
+    log_info "Starting ${RIVER_SPIDER_DIR_NAME} setup script"
+    log_info "Setup started at: ${START_TIMESTAMP}"
+    log_info "Setup logfile:    $LOG_FILE"
+    echo "================================================="
+    print_newline
+    print_newline
+  fi
 }
 
 display_completion_message() {
-  local end_timestamp="$(date +%Y-%m-%d_%H:%M:%S)"
-  printf "\n"
-  log_info "================================================="
-  log_info "         ${RIVER_SPIDER_DIR_NAME} Setup Complete"
-  log_info "================================================="
-  printf "\n"
-  log_info "${tty_bold}---All automated setup steps finished.---${tty_reset}"
-  log_info "Please look back at any ${tty_yellow}'Warning:'${tty_reset} messages just in case."
-  printf "\n"
-  log_info "${tty_bold}--- IMPORTANT NEXT STEPS ---${tty_reset}"
-  log_info "1. ${tty_yellow}Restart your Terminal:${tty_reset}"
-  log_info "   (Alternatively, for your ${tty_bold}current terminal window only)${tty_reset}, you could run:"
-  log_info "      ${tty_green}source${tty_reset} $SHELL_PROFILE_FILE"
-  printf "\n"
-  log_info "2. ${tty_yellow}Complete Manual Google App Script Setup:${tty_reset}"
-  log_info "   If you haven't done it yet, follow the Google App Script setup instructions"
-  log_info "   and make sure to save the Web App URL in:"
-  log_info "      ${tty_green}${RIVER_SPIDER_DIR}/${WEBAPP_URL_FILE_NAME}${tty_reset}"
-  printf "\n"
-  log_info "After restarting your terminal and doing the Google App Script setup,"
-  log_info "you can use the new command like this:"
-  log_info "      ${tty_green}riverspider${tty_reset} ${tty_yellow}<your_file.ttpasm>${tty_reset}"
-  log_info "(You can run this from any folder)."
-  printf "\n"
-  log_info "───────────────────────────────────────────────"
-  log_info "   Details about everything the script did were saved to:"
-  log_info "      ${tty_green}$LOG_FILE${tty_reset}"
-  log_info "───────────────────────────────────────────────"
-  log_info "Script finished execution successfully at ${end_timestamp}"
-  log_info "================================================="
+  local end_timestamp
+  end_timestamp="$(date +%Y-%m-%d_%H:%M:%S)"
+  if [[ "${QUIET}" == "true" ]]; then
+    echo "================================================="
+    echo "Setup completed successfully at: ${end_timestamp}"
+    echo "Log file:         ${LOG_FILE}"
+    echo "================================================="
+  else
+    printf "\n"
+    log_info "================================================="
+    log_info "         ${RIVER_SPIDER_DIR_NAME} Setup Complete"
+    log_info "================================================="
+    printf "\n"
+    log_info "${tty_bold}---All automated setup steps finished.---${tty_reset}"
+    log_info "Please look back at any ${tty_yellow}'Warning:'${tty_reset} messages just in case."
+    printf "\n"
+    log_info "${tty_bold}--- IMPORTANT NEXT STEPS ---${tty_reset}"
+    log_info "1. ${tty_yellow}Restart your Terminal:${tty_reset}"
+    log_info "   (Alternatively, for your ${tty_bold}current terminal window only)${tty_reset}, you could run:"
+    log_info "      ${tty_green}source${tty_reset} $SHELL_PROFILE_FILE"
+    printf "\n"
+    log_info "2. ${tty_yellow}Complete Manual Google App Script Setup:${tty_reset}"
+    log_info "   If you haven't done it yet, follow the Google App Script setup instructions"
+    log_info "   and make sure to save the Web App URL in:"
+    log_info "      ${tty_green}${RIVER_SPIDER_DIR}/${WEBAPP_URL_FILE_NAME}${tty_reset}"
+    printf "\n"
+    log_info "After restarting your terminal and doing the Google App Script setup,"
+    log_info "you can use the new command like this:"
+    log_info "      ${tty_green}riverspider${tty_reset} ${tty_yellow}<your_file.ttpasm>${tty_reset}"
+    log_info "(You can run this from any folder)."
+    printf "\n"
+    log_info "───────────────────────────────────────────────"
+    log_info "   Details about everything the script did were saved to:"
+    log_info "      ${tty_green}$LOG_FILE${tty_reset}"
+    log_info "───────────────────────────────────────────────"
+    log_info "Script finished execution successfully at ${end_timestamp}"
+    log_info "================================================="
+  fi
 }
 
 # This part of the setup cannot be automated by the script.
 display_google_apps_script_setup_instructions() {
-  echo ""
-  log_info "Manual setup of Google App Script:"
-  echo ""
-  echo "👉 Make a copy of:"
-  echo ""
-  echo "   shared/processor/${GOOGLE_SHEETS_DOC_NAME}"
-  echo ""
-  echo "   File > Make a Copy"
-  echo "   Save it to: My Drive"
-  echo ""
-  echo "   Click: 'Make a Copy'"
-  echo ""
-  echo "🔧 In your copy:"
-  echo "   Extensions > Apps Script"
-  echo "   Deploy > New Deployment"
-  echo ""
-  echo "   Description:    River Spider Script"
-  echo "   Execute as:     Me"
-  echo "   Access:         Anyone"
-  echo ""
-  echo "   Click: 'Deploy'"
-  echo ""
-  echo "✅ Authorize and allow access"
-  echo ""
-  echo "🔗 Copy the 'Web App URL'"
-  echo ""
-  open "${GOOGLE_SHEETS_DOC_URL}"
+  if [[ "${QUIET}" == "false" ]]; then
+    echo ""
+    log_info "Manual setup of Google App Script:"
+    echo ""
+    echo "👉 Make a copy of:"
+    echo ""
+    echo "   shared/processor/${GOOGLE_SHEETS_DOC_NAME}"
+    echo ""
+    echo "   File > Make a Copy"
+    echo "   Save it to: My Drive"
+    echo ""
+    echo "   Click: 'Make a Copy'"
+    echo ""
+    echo "🔧 In your copy:"
+    echo "   Extensions > Apps Script"
+    echo "   Deploy > New Deployment"
+    echo ""
+    echo "   Description:    River Spider Script"
+    echo "   Execute as:     Me"
+    echo "   Access:         Anyone"
+    echo ""
+    echo "   Click: 'Deploy'"
+    echo ""
+    echo "✅ Authorize and allow access"
+    echo ""
+    echo "🔗 Copy the 'Web App URL'"
+    echo ""
+    open "${GOOGLE_SHEETS_DOC_URL}"
+  fi
 }
 
 setup_google_webapp_url() {
-  local answer=""
-  local web_app_url=""
-  local prompt="❓ Would you like to view Google Apps Script setup instructions? [Y/n]: "
+  if [[ "${QUIET}" == "false" ]]; then
+    local answer=""
+    local web_app_url=""
+    local prompt="❓ Would you like to view Google Apps Script setup instructions? [Y/n]: "
 
-  while true; do
-    printf "\n"
-    read -rp "$prompt" answer
-    case "$answer" in
-    "" | [Yy]*)
-      display_google_apps_script_setup_instructions
+    while true; do
+      printf "\n"
+      read -rp "$prompt" answer
+      case "$answer" in
+      "" | [Yy]*)
+        display_google_apps_script_setup_instructions
 
-      while true; do
-        read -rp "📥 Paste the Web App URL (or 'q' to cancel): " web_app_url
-        if [[ "$web_app_url" =~ ^[Qq]$ ]]; then
-          echo ""
-          echo "❌ URL entry cancelled by user."
-          echo ""
-          exit 1
-        fi
+        while true; do
+          read -rp "📥 Paste the Web App URL (or 'q' to cancel): " web_app_url
+          if [[ "$web_app_url" =~ ^[Qq]$ ]]; then
+            echo ""
+            echo "❌ URL entry cancelled by user."
+            echo ""
+            exit 1
+          fi
 
-        # Strip surrounding quotes if present
-        web_app_url="${web_app_url%\"}"
-        web_app_url="${web_app_url#\"}"
-        if [[ "$web_app_url" =~ ^https://script\.google\.com/macros/s/.+/exec$ ]]; then
-          ensure_file_writable "$RIVER_SPIDER_DIR/$WEBAPP_URL_FILE_NAME" "Web App url"
-          echo "$web_app_url" >"$RIVER_SPIDER_DIR/$WEBAPP_URL_FILE_NAME"
-          echo ""
-          echo "📝 Web App URL saved to: ${RIVER_SPIDER_DIR}/${WEBAPP_URL_FILE_NAME}"
-          echo ""
-          break
-        else
-          log_warning "⛓️‍💥 Invalid URL."
-          echo "It must match: https://script.google.com/macros/s/{ID}/exec"
-          echo ""
-        fi
-      done
-      break
-      ;;
-    [Nn]*)
-      echo ""
-      echo "⏭️  Setup instructions skipped."
-      echo ""
-      break
-      ;;
-    *)
-      echo ""
-      log_warning "⁉️ Please answer [Y]es or [N]o."
-      ;;
-    esac
-  done
+          # Strip surrounding quotes if present
+          web_app_url="${web_app_url%\"}"
+          web_app_url="${web_app_url#\"}"
+          if [[ "$web_app_url" =~ ^https://script\.google\.com/macros/s/.+/exec$ ]]; then
+            ensure_file_writable "$RIVER_SPIDER_DIR/$WEBAPP_URL_FILE_NAME" "Web App url"
+            echo "$web_app_url" >"$RIVER_SPIDER_DIR/$WEBAPP_URL_FILE_NAME"
+            echo ""
+            echo "📝 Web App URL saved to: ${RIVER_SPIDER_DIR}/${WEBAPP_URL_FILE_NAME}"
+            echo ""
+            break
+          else
+            log_warning "⛓️‍💥 Invalid URL."
+            echo "It must match: https://script.google.com/macros/s/{ID}/exec"
+            echo ""
+          fi
+        done
+        break
+        ;;
+      [Nn]*)
+        echo ""
+        echo "⏭️  Setup instructions skipped."
+        echo ""
+        break
+        ;;
+      *)
+        echo ""
+        log_warning "⁉️ Please answer [Y]es or [N]o."
+        ;;
+      esac
+    done
+  fi
 }
 
 main() {
+
+  for arg in "$@"; do
+    case "${arg}" in
+    -h | --help)
+      print_help
+      return 0
+      ;;
+    -d | --debug)
+      DEBUG="true"
+      QUIET="false"
+      break
+      ;;
+    -q | --quiet)
+      QUIET="true"
+      DEBUG="false"
+      break
+      ;;
+    *)
+      echo "Unknown option: ${arg}" >&2
+      return 1
+      ;;
+    esac
+  done
   # Set up the colors for messages.
   setup_terminal_colors
   # Create/clear the log file and show starting messages on screen.
   display_startup_message
 
   log_info "=== PHASE 1: System Validation ==="
-  echo "───────────────────────────────────────────────"
+  print_separator
   check_required_system_commands          # Are basic tools present?
   check_operating_system_and_architecture # Is it macOS? Intel/Apple Silicon?
   check_internet_connectivity             # Can it reach the internet?
   determine_shell_and_profile             # Which shell? Where's the profile file?
-  echo "───────────────────────────────────────────────"
+  print_separator
   log_success "System validation complete."
-  echo
-  echo
+  print_newline
+  print_newline
   log_info "=== PHASE 2: Dependency Installation ==="
-  echo "───────────────────────────────────────────────"
+  print_separator
   setup_homebrew_environment # Install/configure/update Homebrew.
   install_required_packages  # Install mise, fd, etc.
   verify_installed_tools     # Check installed tools are working.
   configure_mise_environment # Set up mise in the shell.
   install_java_with_mise     # Install OpenJDK using mise.
-  echo "───────────────────────────────────────────────"
+  print_separator
   log_success "Dependency installation complete."
-  echo
-  echo
+  print_newline
+  print_newline
   log_info "=== PHASE 3: '${RIVER_SPIDER_DIR_NAME}' Setup ==="
-  echo "───────────────────────────────────────────────"
+  print_separator
   find_river_spider_directory               # Find or download the riverSpider folder.
   set_river_spider_dir_variable             # Always remember where the riverSpider folder is.
   update_paths_in_riverspider_submit_script # Fix paths inside submit.sh (so it can be called from anywhere)
   add_river_spider_shell_helper_function    # Add the 'riverspider' command.
-  echo "───────────────────────────────────────────────"
+  eprint_separator
   log_success "'${RIVER_SPIDER_DIR_NAME}' configuration complete."
-  echo
+  print_newline
 
   # Show the final "all done" message.
   display_completion_message
