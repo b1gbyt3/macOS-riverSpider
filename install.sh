@@ -254,7 +254,6 @@ ensure_directory_exists() {
     echo "[ERROR] Missing arguments. Please provide the names of directories to check." >&2
     exit 1
   fi
-  echo "[DEBUG] Ensuring directory(ies) exist(s): $*"
   ensure_log_file_exists_and_writable
   echo "[DEBUG] Ensuring directory(ies) exist(s): $*" >>"${LOG_FILE}"
   local missing_directory=()
@@ -276,7 +275,6 @@ ensure_directory_exists_and_writable() {
     echo "[ERROR] Missing arguments for ensure_directory_exists_and_writable." >&2
     exit 1
   fi
-  echo "[DEBUG] Ensuring directory(ies) are writable: $*"
   ensure_log_file_exists_and_writable
   echo "[DEBUG] Ensuring directory(ies) are writable: $*" >>"${LOG_FILE}"
   ensure_directory_exists "$@"
@@ -616,7 +614,7 @@ configure_homebrew_shell_environment() {
   if [[ ! -x "${HOMEBREW_PATH}" ]]; then
     log_error "Homebrew executable not found at '${HOMEBREW_PATH}'. Cannot configure shell environment. Run installation step first."
   fi
-  local brew_shellenv_line="eval \"\$(\"${HOMEBREW_PATH}\" shellenv)\""
+  local brew_shellenv_line="eval \"\$(${HOMEBREW_PATH} shellenv)\""
   log_debug "Homebrew shellenv line to add/check in profile: ${brew_shellenv_line}"
   if ! add_line_if_missing "${brew_shellenv_line}" "${SHELL_PROFILE_FILE}"; then
     log_error "Failed to add Homebrew shellenv configuration to '${SHELL_PROFILE_FILE}'. Check file permissions."
@@ -841,11 +839,12 @@ clean_up_riverspider_download() {
   log_info "Cleaning up ${RIVER_SPIDER_ZIP_NAME} and ${RIVER_SPIDER_EXTRACT_DIRECTORY}..."
   log_debug "Ensuring target directory exists: ${RIVER_SPIDER_TARGET_DIRECTORY}"
   mkdir -p "${RIVER_SPIDER_TARGET_DIRECTORY}"
-  log_debug "Moving contents to $RIVER_SPIDER_TARGET_DIRECTORY..."
-  mv "${extracted_source_dir}/"* "${RIVER_SPIDER_TARGET_DIRECTORY}"
+  log_debug "Moving contents to ${RIVER_SPIDER_TARGET_DIRECTORY}..."
+  cp -R "${extracted_source_dir}/"* "${RIVER_SPIDER_TARGET_DIRECTORY}" 2>/dev/null || log_warning "Failed to copy files from ${extracted_source_dir} to ${RIVER_SPIDER_TARGET_DIRECTORY}. Check permissions."
   log_debug "Moved contents to ${RIVER_SPIDER_TARGET_DIRECTORY}."
   log_debug "Removing ${RIVER_SPIDER_EXTRACT_DIRECTORY} and ${RIVER_SPIDER_OUTPUT_FILE}..."
-  rm -rf "${RIVER_SPIDER_EXTRACT_DIRECTORY}" "${RIVER_SPIDER_OUTPUT_FILE}"
+  rm -rf "${RIVER_SPIDER_EXTRACT_DIRECTORY}" || log_warning "Failed to remove ${RIVER_SPIDER_EXTRACT_DIRECTORY}. Check permissions."
+  rm -f "${RIVER_SPIDER_OUTPUT_FILE}" || log_warning "Failed to remove ${RIVER_SPIDER_OUTPUT_FILE}. Check permissions."
   log_debug "Extraction and cleanup complete. Files are in $RIVER_SPIDER_TARGET_DIRECTORY"
   find_river_spider_directory
 }
@@ -1022,7 +1021,7 @@ add_river_spider_shell_helper_function() {
     log_success "'${helper_function_name}' helper function already exists in ${SHELL_PROFILE_FILE}"
   else
     log_info "Adding River Spider helper function to ${SHELL_PROFILE_FILE}..."
-    read -r -d '' HELPER_FUNCTIONS <<-EOF
+    cat <<-EOF >>"${SHELL_PROFILE_FILE}"
 #=======  START River Spider helper function =======
 riverspider() {
   local ttpasm_file=\$1
@@ -1124,15 +1123,15 @@ logreg(){
 #=======  END Logisim helper function =======
 EOF
 
-    if [[ -z "${HELPER_FUNCTIONS}" ]]; then
-      log_error "Failed to create helper function content."
-    fi
-    echo "${HELPER_FUNCTIONS}" >>"${SHELL_PROFILE_FILE}"
-    if grep -q "${helper_function_name}()" "${SHELL_PROFILE_FILE}"; then
-      log_success "Added '${helper_function_name}' helper function to shell profile"
-      log_debug "Confirmed '${helper_function_name}' helper function exists in ${SHELL_PROFILE_FILE}."
+    if [[ $? -ne 0 ]]; then
+      log_warning "Failed to add '${helper_function_name}' helper function to ${SHELL_PROFILE_FILE}."
     else
-      log_warning "Failed to add '${helper_function_name}' helper function."
+      if grep -q "${helper_function_name}()" "${SHELL_PROFILE_FILE}"; then
+        log_success "Added '${helper_function_name}' helper function to shell profile"
+        log_debug "Confirmed '${helper_function_name}' helper function exists in ${SHELL_PROFILE_FILE}."
+      else
+        log_warning "Failed to add '${helper_function_name}' helper function to ${SHELL_PROFILE_FILE}."
+      fi
     fi
   fi
 }
