@@ -1329,7 +1329,7 @@ setup_google_webapp_url() {
           web_app_url="${web_app_url#\'}" # Remove leading single quote
           log_debug "User input URL: ${web_app_url}"
           if [[ "${web_app_url}" =~ ${url_pattern} ]]; then
-            echo "${web_app_url}" >"${RIVER_SPIDER_DIR}"
+            echo "${web_app_url}" >"${webapp_file_path}"
             echo ""
             echo "📝 Web App URL saved to: ${webapp_file_path}"
             echo ""
