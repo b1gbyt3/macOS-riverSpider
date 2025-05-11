@@ -3,7 +3,7 @@
 # riverSpider macOS Setup Script
 #
 # Author: Ilya Babenko
-# Last updated: 2025-05-08
+# Last updated: 2025-05-09
 # Version: 2.4.0
 #
 # What this script does:
@@ -132,6 +132,7 @@ declare CHIP_TYPE=""              # A friendly name for the chip ("Apple Silicon
 declare MISE_SHELL_TYPE=""        # The shell name 'mise' needs ("zsh" or "bash").
 declare RIVER_SPIDER_DIR=""       # Full path to where the 'riverSpider' folder was found.
 
+declare ENABLED_TTY_COLORS=false # If true, terminal colors are enabled.
 declare TTY_BLUE=""   # Blue color for terminal messages.
 declare TTY_RED=""    # Red color for terminal messages.
 declare TTY_YELLOW="" # Yellow color for terminal messages.
@@ -352,9 +353,11 @@ print_help() {
 
 setup_terminal_colors() {
   if [[ -t 1 ]]; then
+    ENABLED_TTY_COLORS=true
     echo "[DEBUG] Terminal colors are enabled." >>"${LOG_FILE}"
     tty_escape() { printf "\033[%sm" "$1"; }
   else
+    ENABLED_TTY_COLORS=false
     echo "[DEBUG] Terminal colors are disabled (not a terminal)." >>"${LOG_FILE}"
     tty_escape() { :; }
   fi
@@ -369,8 +372,15 @@ setup_terminal_colors() {
   TTY_RESET=$(tty_escape 0)   # Reset text to normal
 }
 
+ensure_terminal_colors() {
+   ensure_global_variable_has_value "ENABLED_TTY_COLORS"
+  if [[ "${ENABLED_TTY_COLORS}" == "true" ]]; then
+    ensure_global_variable_has_value "TTY_BLUE" "TTY_RED" "TTY_YELLOW" "TTY_GREEN" "TTY_BOLD" "TTY_RESET"
+  fi
+}
+
 log_info() {
-  ensure_global_variable_has_value "TTY_BLUE" "TTY_BOLD" "TTY_RESET"
+  ensure_terminal_colors
   ensure_log_file_exists_and_writable
   local msg="$*"
   if [[ "${QUIET}" == "false" ]]; then
@@ -380,7 +390,7 @@ log_info() {
 }
 
 log_success() {
-  ensure_global_variable_has_value "TTY_GREEN" "TTY_RESET"
+  ensure_terminal_colors
   ensure_log_file_exists_and_writable
   local msg="$*"
   if [[ "${QUIET}" == "false" ]]; then
@@ -390,7 +400,7 @@ log_success() {
 }
 
 log_warning() {
-  ensure_global_variable_has_value "TTY_YELLOW" "TTY_RESET"
+  ensure_terminal_colors
   ensure_log_file_exists_and_writable
   local msg="$*"
   printf "${TTY_YELLOW}Warning${TTY_RESET}: %s\n" "${msg}" >&2
@@ -399,7 +409,7 @@ log_warning() {
 
 # Shows error messages and stops the script.
 log_error() {
-  ensure_global_variable_has_value "TTY_RED" "TTY_RESET"
+  ensure_terminal_colors
   ensure_log_file_exists_and_writable
   local abort_timestamp
   abort_timestamp="$(date +%Y%m%d_%H%M%S)"
@@ -1157,7 +1167,8 @@ display_startup_message() {
 }
 
 display_completion_message() {
-  ensure_global_variable_has_value "RIVER_SPIDER_DIR_NAME" "RIVER_SPIDER_DIR" "WEBAPP_URL_FILE_NAME" "SHELL_PROFILE_FILE" "TTY_BOLD" "TTY_RESET" "TTY_YELLOW" "TTY_GREEN" "QUIET"
+  ensure_terminal_colors
+  ensure_global_variable_has_value "RIVER_SPIDER_DIR_NAME" "RIVER_SPIDER_DIR" "WEBAPP_URL_FILE_NAME" "SHELL_PROFILE_FILE" "QUIET"
   ensure_directory_exists "${RIVER_SPIDER_DIR}"
   ensure_log_file_exists_and_writable
   local end_timestamp
@@ -1211,7 +1222,8 @@ display_completion_message() {
 
 # This part of the setup cannot be automated by the script.
 display_google_apps_script_setup_instructions() {
-  ensure_global_variable_has_value "GOOGLE_SHEETS_DOC_NAME" "GOOGLE_SHEETS_DOC_URL" "QUIET" "TTY_BOLD" "TTY_RESET" "TTY_YELLOW" "TTY_GREEN"
+  ensure_terminal_colors
+  ensure_global_variable_has_value "GOOGLE_SHEETS_DOC_NAME" "GOOGLE_SHEETS_DOC_URL" "QUIET"
   if [[ "${QUIET}" == "false" ]]; then
     open "${GOOGLE_SHEETS_DOC_URL}" 2>/dev/null || log_warning "Failed to open Google Sheets document URL in browser."
     log_info "${TTY_BOLD}--- Manual Google App Script Setup Instructions ---${TTY_RESET}"
@@ -1260,7 +1272,8 @@ display_google_apps_script_setup_instructions() {
 }
 
 setup_google_webapp_url() {
-  ensure_global_variable_has_value "RIVER_SPIDER_DIR" "WEBAPP_URL_FILE_NAME" "TTY_BOLD" "TTY_RESET" "TTY_GREEN" "QUIET"
+  ensure_terminal_colors
+  ensure_global_variable_has_value "RIVER_SPIDER_DIR" "WEBAPP_URL_FILE_NAME" "QUIET"
   ensure_directory_exists "${RIVER_SPIDER_DIR}"
   if [[ "${QUIET}" == "false" ]]; then
     local webapp_file_path="${RIVER_SPIDER_DIR}/${WEBAPP_URL_FILE_NAME}"
