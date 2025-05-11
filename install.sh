@@ -3,8 +3,8 @@
 # riverSpider macOS Setup Script
 #
 # Author: Ilya Babenko
-# Last updated: 2025-05-09
-# Version: 2.4.0
+# Last updated: 2025-05-10
+# Version: 2.4.1
 #
 # What this script does:
 # This script helps set up the riverSpider on your Mac automatically.
